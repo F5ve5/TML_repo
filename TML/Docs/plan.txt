@@ -1,0 +1,14 @@
+260622
+
+This project is for the Stardance Hackathon "Frictionless" Mission.
+The mission is to make a service which solves some problem on the internet.
+
+So, I have decided to start researching and working on a sort of "Task Manager Logger". In other words a service that is supposed to not only show the programs currently running (like Task Manager) but everything that has been running since the computer started, or at least since as early as possible.
+
+As for the problem that this service would solve, I think that a lot of people would better like to know about what's actually happening in their pc, whether it's to eliminate pesky little in-and-out viruses, to optimize or just to have a better feel of what's going on. There's definitely a lack of transparency from the system after mysterious CMD flashes or oddly slow startups. And from what I've seen there aren't many pieces of software that compensate for it, or at least not exclusively in the way I've explained.
+
+I think that this project not only has potential to fulfill a small and narrow niche but also to be expanded upon, maybe by adding settings that exclude OS processes or others that aren't a point of interest or something similar.
+
+
+
+
