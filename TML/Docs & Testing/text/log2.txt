@@ -1,0 +1,65 @@
+<260627
+
+So I accidentally forgot to save the log that existed before I started writing today but it was mostly about me finding out about the
+different alternatives that existed for gathering process data and then narrowing it down to ETW instead of like WMI or
+CreateToolhelp32Snapshot because WMI unnecessarily "wrapped up" and the latter is unoptimal for continously tracking processes. ETW
+on the other hand is basically exactly what I was looking for, a low-level system-intergrated API which runs continously and returns
+lots of rich data.
+
+And I chose Rust for the language because I wanted to.
+
+260627
+
+Time to start coding and in Rust which I haven't even Hello World'd before.
+
+So it seems that there are other languages that come with ready "ETW Intergration". Here they are:
+
+C#, F# and Visual Basic have deep windows intergration via .NET
+And .NET is a cross-platform software development platform that provides libraries, tools and a runtime for a few different languages
+whereas C# is the most prominent one. And "cross-platform" refers to the fact that it works on both Linux, Windows, iOS and More.
+In principle, .NET works as an abstraction layer between high-level code and different operating systems so that code can stay simple
+and system interactions sort of clean.
+
+Of course, abstraction isn't always good because it could scrape away some features that I might like.
+
+C doesn't really have something "in it" that allows for easier interaction with ETW but the windows coding environment is made to be
+interacted with using C.
+
+There aren't many setbacks to using C to access ETW.
+
+On the other hand, Rust and every other language generally use the same method accessing ETW. This method is called FFI (Foreign
+Function Interface) and it does what it sounds like; makes it possible to call other language (usually C) functions from the native
+language.
+
+FFI proves to be one of the most important concepts when doing systems programming in Rust. At its' core it's just Rust calling code
+that wasn't written in Rust, but how does it work if I were to implement it? Let's compare a normal function call to one using FFI:
+
+fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+fn main() {
+    let x = add(5, 3);
+}
+
+When the compiler runs the function call, it already knows;
+
+Where the function is
+
+Its' paremeter types
+
+Its' return type
+
+That the calling convention is according to Rusts' ABI (Application Binary Interface)
+Another new word. Basically the ABI handles how compiled code talks to other compiled code in memory. Not so basically, this means
+that the ABI of different languages do the following things differently:
+
+How function paremeters are passed
+
+How return values are delivered
+
+How structs (objects, classes and stuff) are structured in memory
+
+How function and variable names end up looking in binary (also called "name mangling")
+
+Further calling conventions such as how the stack is cleaned and just how a language looks in memory
