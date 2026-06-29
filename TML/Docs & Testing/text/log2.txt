@@ -63,3 +63,84 @@ How structs (objects, classes and stuff) are structured in memory
 How function and variable names end up looking in binary (also called "name mangling")
 
 Further calling conventions such as how the stack is cleaned and just how a language looks in memory
+
+260629
+
+Today I have started researching and writing a few lines in Rust, or more specifically FFI in Rust. I think that the lines of code I
+wrote gave me a pretty good introduction to it all.
+
+The first line in my code is something called an "attribute" and apparently it makes it so that the remainder of the script runs under 
+some form of attribute.
+The attribute I had set was a linking against windows library "advapi32", a DLL.
+
+It's in this linked DLL that I'll access the functions that expose data gathered by ETW.
+
+And how I run the functions isn't exactly what I'd guessed but I've seen something similar before. It's basically the same as a header
+in C/C++, just that it's not in a header file.
+
+How it works is that you write the function signatures for all of the functions you'll be using aka. you "declare" all of them
+(function signature is the name, paremeters and return type) and during linking if the function symbol (just the name) between a
+function signature you've written and a function that exists in a linked library matches, calling the one you've written
+will call the actual complete one.
+
+Think about it like this:
+
+You declare the signature
+int Add(int a, string b)
+
+You compile so that LINKING occurs
+
+The LINKED library has function
+int Add(int a, int b)
+{
+result = a + b;
+
+return result;
+}
+(notice how the actual logic is in here)
+
+The LINKER notices that the symbols between your function signature and the linked function match (the symbol is Add)
+
+Now, calling
+int Add(int a, string b)
+in your script will run
+int Add(int a, int b)
+{
+result = a + b;
+
+return result;
+}
+Even though the paremeters don't match, because only the function name aka. the symbol has to match
+
+This will cause an error in the linked librarys' function
+
+Update: Upon further looking into it, most languages have function symbols as both the name and paremeters in some format, but in C
+the above explanation is accurate. And C is the only function type I've linked towards so far. This is not that important tbh.
+
+Either way, at the point of writing this I have paused just before getting to the part of writing the actual functions and before
+continuing coding I think that there is one more important aspect that I should write about and that aspect is that the linked
+functions are in another language (or atleast using another ABI).
+
+In my code, there is one line that accounts for this and that is:
+
+unsafe extern "system"
+
+This line is followed by two brackets in which all of the function declarations are to be written. What the line actually does is
+to handle all of its' content according to another ABI, in this case that of the system.
+
+The "unsafe" notation was automatically added upon writing the latter two words for me. Probably on behalf of the fact that the
+linker might later return errors if I've mistyped any function declarations.
+
+A breakthrough that I just recently got is that a function declaration is completely different from a function itself. One is no
+more than a request and the other is actual logic, so when I declare a function for myself nothing is really created in memory for
+a linker to find a match for. The only thing that actually is created is a request for what I am asking for.
+
+In more concrete terms, extern "system" doesn't lay out incomplete functions in memory and then link them towards their full forms.
+Rather, requests are sent in the language of "system" and that's it, the linker handles the rest. I just feel like declarations
+could be less similar to complete functions because of how different they really are in what they do.
+
+Also, because of Rusts' name mangling, its' way worse at being linked towards than something like C which has much simpler function
+names in memory. Even though Rust can apparently unmangle using the attribute #[no_mangle]. Kinda goofy.
+
+We're in notepad because VS Code won't stop crashing. I really hope it's not because of that non-working word count extension I
+installed.
