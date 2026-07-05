@@ -144,7 +144,7 @@ Rather, requests are sent in the language of "system" and that's it, the linker 
 could be less similar to complete functions because of how different they really are in what they do.
 
 Also, because of Rusts' name mangling, its' way worse at being linked towards than something like C which has much simpler function
-names in memory. Even though Rust can apparently unmangle using the attribute #\[no\_mangle]. Kinda goofy.
+names in memory. Even though Rust can apparently unmangle using the attribute #[no_mangle]. Kinda goofy.
 
 We're in notepad because VS Code won't stop crashing. I really hope it's not because of that non-working word count extension I
 installed.
@@ -228,20 +228,43 @@ its' type.
 And all of this fuzz about a reference being a pointer but with "extra flavor" I think is just thinking too much about C pointers. A reference can be formed
 using a pointer to refer to the original variable but it can be referred to in other ways as well.
 
----
+-----
 
 One more thing that I found interesting because it might present a problem later on was memory allocation before calling these windows functions.
 
 I think everything that's worth going into is that:
 
 let mut buffer = vec![0u8; 4096];
-Looks real intimidating but simply allocated 4096 bytes of memory on the stack
+Looks real intimidating but simply allocates 4096 bytes of memory on the stack
 
 buffer.as_mut_ptr()
 Then gives the adress to that stack
 
 So like if something says "Hey I need 4096 bytes to lay all this info out" you'd allocate it first and then pass the pointer. Same as how you'd free up space
-and then say where that space is.
+and then say where that space is so that things can go in there.
 
-Then there's boxes
+The data is allocated in a memory region called the "heap" which is basically one of the two most important memory regions to know about, the other being
+the stack. I basically know how the stack works but I don't wanna explain it, the heap however is for more permanent memory which remains relevant for more
+than just one function call.
+
+Another way to allocate memory on the heap is by boxing it.
+
+Boxing a value is just allocating a single value in memory and then having a pointer to it, or a "smart" pointer because it cand do things like modify the
+allocated value without dereferencing manually. In code it looks like this:
+
+let x = Box::new(5);
+
+Here 5 is being boxed and the box is x.
+
+-----
+
+Knowing all of this I should be decently prepared to write the FFI ETW functions, right?
+...
+Okay so it's not really as obvious as I thought what I am looking to utilize of ETW right now. After thinking over it I think my approach right now should
+be configuring recieving notifications from ETW. The reason why I'm not approaching starting a ETW session immediately is because it's another big part of the
+project which I haven't prepared for yet, making it start as early as possible and all. For now I might start an ETW session normally just to debug but that's
+it.
+
+So the question for now is "How do I get data from an ETW session subscribed to WindowsKernelProcessProvider and interpret it in my code?" This question sorta
+falls back unto what I've been studying.
 
