@@ -10,6 +10,6 @@ extern "system"
 //Or in other words, Rust can't tell right now if the linker will return an error later.
 //
 //Read all of the above with a grain of salt, I wish writing as if I were omnipotent wasn't engraved into my mind by school.
-{ 
+{
 
 }

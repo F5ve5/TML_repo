@@ -195,7 +195,7 @@ Two words that I sort of thought were the same thing: references and pointers. B
 A pointer is what I thought they both were in some form, a number which in some way gives away the adress of the object it's refering to,
 
 A reference is more like making another variable for a variable but under a different alias, like say you have very significant variable "x", you might then
-make multiple different references to that variable named "y", "z" and "å" each with their own use but modifying the same variable underneath.
+make multiple different references to that variable named "y", "z" and "a" each with their own use but modifying the same variable underneath.
 
 Actually think about it this way, Terry is a very special guy with multiple occupations and hobbies:
 
@@ -267,4 +267,16 @@ it.
 
 So the question for now is "How do I get data from an ETW session subscribed to WindowsKernelProcessProvider and interpret it in my code?" This question sorta
 falls back unto what I've been studying.
+
+260705
+
+So ETW seems to have two distinct roles, and those are;
+
+1. Producer / Session management
+Where I create a session and subscribe it to the events that I want data on
+
+2. Consumer
+Where I connect to an existing session and recieve the data before "decrypting" and interpreting it
+
+And the part that I'm gonna do first is part no. 2
 
