@@ -431,3 +431,9 @@ them)
 
 And that is it I think, I already have a decent understanding of most of these so I don't see the problem of taking the (clearly recommended) shortcut.
 
+Now onto the command to run in the terminal, looking for it online had me worried for a moment because they were talking about "Cargo new" as if I was supposed to know
+what it was but all it does is create the folder structure that I've already created so we good. Anyways the command for getting the crate is "Cargo build" and powershell
+is giving me an error for the "Cargo" command not being found which is understandable because the only Rust-related thing I've installed is the extension for VSCode.
+
+Looked it up and configured rustup on my device. Seems right I think. Now Cargo runs but I'm getting error "string values must be quoted, expected literal string".
+
