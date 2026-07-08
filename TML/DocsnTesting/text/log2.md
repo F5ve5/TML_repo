@@ -473,3 +473,69 @@ crate instead, I guess my job becomes more about like configuring the later use 
 
 Holy yap sesh
 
+-----
+
+Although before continuing further I'll check whether the crate I added is working. I do this by simply referring to the crate in main and compiling my project which I do by
+running Cargo run in the driectory of my Cargo.toml file and src folder. I was met with the following error:
+
+"
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.46                                                                                                                                                                                                                  
+error: linker `link.exe` not found                                                                                                                                                                                                          
+  |
+  = note: program not found
+
+note: the msvc targets depend on the msvc linker but `link.exe` was not found
+
+note: please ensure that Visual Studio 2017 or later, or Build Tools for Visual Studio were installed with the Visual C++ option                                                                                                            
+
+note: VS Code is a different product, and is not sufficient
+
+error: could not compile `quote` (build script) due to 1 previous error                                                                                                                                                                     
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `proc-macro2` (build script) due to 1 previous error                                                                                                                                                               
+PS C:\Users\nora.svahn\Desktop\TML_repo\TML\DocsnTesting\code> 
+"
+
+So this error message mostly consists of lines "note:", "error:" and "warning:" besides the weird stuff happening at the start and the project directory at the end. I don't think
+it's worth delving into every error so I'll just look for the quickest solution.
+
+260708
+
+Next day and I found the solution. It was that I had to have had the vsc c++ package thing on visual studio installed so I got that done.
+
+Just one more error came up after that and that was because my main.rs script didn't have a main() function.
+
+Now it compiled though.
+
+To speak of all the dependency files that Cargo.toml adds to my project when "cargo run" or just "cargo build" is run, I am apparently supposed to put it in .gitignore because each
+time that my program will be run on a new device all of those files should be installed again.
+
+That makes it make more sense to me.
+
+Before I was confused about why you wouldn't just install the dependencies once and be done with it instead of configuring it through some special file but now it makes more sense.
+
+It's basically a note which contains a more abstract version of what is needed for a program to run, so that; instead of every possible solution being installed initially, just the
+single one thats necessary can be installed.
+
+Also including .vscode in my gitingore
+
+And of course running git rm -r --cached on both of them
+
+the only generated thing that should stay in the repo that comes to mind right now is Cargo.lock, its' role appears to be to ensure that everyone gets the same version of dependency
+
+What's next again?
+
+I guess getting into the logic
+
+All of the scripts that I've made could definitely still be put to use, even though I installed a crate for all of the dependencies, or some of them at least. I'll probably end up
+reorganizing a lot on the near future, like around decrypting the pointers' data and all
+
+Using scripts other from the main script is done by typing "mod [scriptname];" at the top same time as it's in the same directory. This isn't necessary if it's a crate added with
+Cargo. Something that's true for both cargo crates and same directory scripts though is that you can typ "use [script/crate]::[further-specification]::[function];" at the top of the
+script to not have to write "[script/crate]::[further-specification]::" every time you use [function].
+
+Removed every script except for main.rs
+
+Now to get that pointer to the etw data, get the necessary info out of it and then eventually decrypt it into something that can be used to make ui
+

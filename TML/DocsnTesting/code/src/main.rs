@@ -1,1 +1,6 @@
-use windows::Win32::System::Diagnostics::Etw::*;
+mod ffi0;
+
+pub fn main() {
+    println!("Hello, world!");
+}
+
