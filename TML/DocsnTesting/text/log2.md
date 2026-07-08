@@ -435,5 +435,41 @@ Now onto the command to run in the terminal, looking for it online had me worrie
 what it was but all it does is create the folder structure that I've already created so we good. Anyways the command for getting the crate is "Cargo build" and powershell
 is giving me an error for the "Cargo" command not being found which is understandable because the only Rust-related thing I've installed is the extension for VSCode.
 
-Looked it up and configured rustup on my device. Seems right I think. Now Cargo runs but I'm getting error "string values must be quoted, expected literal string".
+Looked it up and configured rustup on my device. Seems right I think. Now Cargo runs but I'm getting error "string values must be quoted, expected literal string". Fixed,
+had to put "windows::Win32::System::Diagnostics" inside quotation marks. Now getting error "this virtual manifest specifies a `dependencies` section, which is not allowed".
+Asked ChatGPT and apparently there are "two different kinds of Cargo.toml" and of course I am using the wrong one, I don't think that makes any sense but ok. 
+
+So because I don't have any experience using Rust I just ChatGPT'd the errors. I was given this:
+
+[package]
+name = "TML"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+windows = { version = "0.62", features = ["Win32_System_Diagnostics_Etw"] }
+
+Which does three things. First it replaces [dependencies.windows] with [dependencies] which definitely makes more sense to me since it's supposed to be a category inside of
+Cargo.toml and not a part of the crate. Second it changed the version ">=0.59, <=0.62" as recommended by Crates.io to just "0,62" (This could probably be a case for errors in             \\//
+the future so I guess I'll mark this place in the log somehow). Third it added the package part which specifies the custom name of my project, the custom version of my project             \\  
+dependency-wise and also the version of Rust that it uses in one way or another, that way or another being that you can only run main otherways so pretty important actually.              //\\
+
+And yayyy Cargo build worked!
+
+260707
+
+So as I wrote in my previous commit, now all of my scattered Rust files actually count as a Rust project with the addition of the built Cargo.toml file as well as the newly
+added dependencies.
+
+So now that as I previously mentioned, all of the types, functions, structs etc. are in place, it's time to get around to utilizing them. I also believe that I in some point in
+the past specified what this step would be about, that being that I'd first get the pointer to the ETW buffer and that I'd do that inside of the "ffi_functions" script which was
+supposedly reserved for linked Windows functions, and that I'd then continue to further decrypt the data in that buffer in the "ffi_EventDecrypter" script (this scripts name has
+changed many times so maybe it's hard to me writing about it earlier in the log).
+
+Actually, looking back at this explanation it didn't really make a lot of sense to organise the "course of action" across scripts as I should actually only declare in those
+scripts what I'll refer to through main. And obviously right now I also just refer to everything from main, so it's less about "do this here and that there" and more about just
+preparing the proper tools in different scripts, or at least it was about that before when I had to like link and declare everything concrete manually but now that came in the
+crate instead, I guess my job becomes more about like configuring the later use of the complete setup which might allow me to explore a few different alternatives.
+
+Holy yap sesh
 
