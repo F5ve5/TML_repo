@@ -539,3 +539,17 @@ Removed every script except for main.rs
 
 Now to get that pointer to the etw data, get the necessary info out of it and then eventually decrypt it into something that can be used to make ui
 
+260709
+
+Something that I have not accounted for in the past is that the "linker" has to be installed and "linking" is not a default part of compilation. Like how I have to install some kind
+of microsoft linker in order to run the etw functions.
+
+Now to maybe finally get to what's 7 lines further up
+
+It seems like the etw data is delivered inside of an "EVENT_RECORD" struct, and something that I seem to have understood correctly is the fact that I am given a pointer to that
+struct which afterwards enables met to decipher it.
+
+Now how I get the pointer is that I write a function myself that can be called whatever but with an "*EVENT_HEADER" argument, and then I pass the adress of that function to windows
+which allows the system to call it.
+
+How I pass the pointer of the function to windows is that I
