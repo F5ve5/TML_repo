@@ -549,7 +549,58 @@ Now to maybe finally get to what's 7 lines further up
 It seems like the etw data is delivered inside of an "EVENT_RECORD" struct, and something that I seem to have understood correctly is the fact that I am given a pointer to that
 struct which afterwards enables met to decipher it.
 
-Now how I get the pointer is that I write a function myself that can be called whatever but with an "*EVENT_HEADER" argument, and then I pass the adress of that function to windows
+Now how I get the pointer is that I write a function myself that can be called whatever but with an "*EVENT_RECORD" argument, and then I pass the adress of that function to windows
 which allows the system to call it.
 
-How I pass the pointer of the function to windows is that I
+Actually a very good way to think about interacting with windows is that you basically make a large struct with a bunch of information which you then send into the system so that it
+basically works as a construction manual for how windows should use your code in its' own workflow.
+
+And one of the pieces of information in this large struct is this function you make where Windows funnels the necessary information
+
+The alternative to the this model would be just making a function with as many arguments as the struct has variables
+
+And in this model in my case, that "construction manual" is:
+
+"
+let mut logfile = EVENT_TRACE_LOGFILEW {
+    LoggerName: default(),
+    LogFileName: default(),
+    CurrentTime: 0,
+    BuffersRead: 0,
+    LogFileMode: EVENT_TRACE_REAL_TIME_MODE,
+    LoggerThreadId: 0,
+    LogFileHeader: std::ptr::null_mut(),
+    BufferCallback: None,
+    BufferSize: 0,
+    Filled: 0,
+    EventsLost: 0,
+    EventCallback: None,
+    IsKernelTrace: 0,
+    Context: std::ptr::null_mut(),
+};
+"
+
+And in this large, theorejhtical manual with a bunch of different checkboxes and lines to be filled before being passed to the system, my function goes into the section
+EventRecordCallback, thus:
+
+logfile.EventRecordCallback = Some(callback);
+
+And something very convenient about filling out this manual is that you are able to only fill in the fields that you care about, using a feature called "the default trait" where
+every variable of a struct has a "default" value if the trait has been attributed to the struct.
+
+So as it seems right now, I shouldn't have to account for dozens of struct variablesd just to be able to get the etw data
+
+So instead of writing what I did earlier, I can just write:
+
+"
+let mut logfile = EVENT_TRACE_LOGFILEW::default();
+"
+
+And then I assign the variables that matter afterwards:
+
+"
+logfile.EventRecordCallback = Some(callback);
+
+logfile.lalala = 5;
+"
+
