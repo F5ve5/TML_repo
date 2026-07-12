@@ -596,11 +596,112 @@ So instead of writing what I did earlier, I can just write:
 let mut logfile = EVENT_TRACE_LOGFILEW::default();
 "
 
-And then I assign the variables that matter afterwards:
+Here I don't have to declare the type of logfile before the "=" mark thanks to "type interference". Because it can only possibly be one type to store the type on the right of the
+mark
+
+I assign the variables that matter afterwards:
 
 "
 logfile.EventRecordCallback = Some(callback);
 
 logfile.lalala = 5;
 "
+
+260710
+
+It seems that there are only three variables that i have to alter in the defaulted struct in order for the etw interaction to work at an absolute minimum. These are:
+
+LoggerName - The name of the etw session I am connecting to, according to windows syntax so it's different from a regular Rust string. Elaborated on later
+
+EventRecordCallback - The pointer to my EVENT_RECORD callback function. Elaborated on later too
+
+ProcessTraceMode - This variable determines some of how the interaction between my code and etw will work, it's a flag variable, two of which I have to alter.
+I never really got around to understanding how flags worked other than that they basically served as signatures for determining how a process would run, but they're very simple;
+Flags are usually stored inside of a uint and each flag takes up only one bit, meaning that if you're using a u16 you can basically store 16 bools inside of it. So flags are like
+bools but much more versatile, or at least more memory-friendly.
+
+The two flags taht I have to change are:
+
+REAL_TIME - Says that I am consuming a real-time session rather than reading en ".etl" file (Which I guess is like a stationary file containing similar data to a live etw session)
+
+EVENT_RECORD - Says that my function is using the more modern "*EVENT_RECORD" argument rather than the older ""EVENT_TRACE"
+
+And because I already have the flag constants declared in the crate, I already know what bits that the each respective flag represents so I can just run the following:
+
+"
+logfile.ProcessTraceMode =
+    PROCESS_TRACE_MODE_REAL_TIME |
+    PROCESS_TRACE_MODE_EVENT_RECORD;
+"
+
+Making the two bits be modified together:
+
+"
+0001
++
+0010
+|
+V
+0011
+"
+
+Assigning my functions' pointer to EventRecordCallback is written as:
+
+"
+logfile.EventRecordCallback = Some(callback);
+"
+
+The "Some(...)" is explained a few lines down
+
+Right now I have a pretty clear understanding of why the whole thing works, like the struct "EVENT_TRACE_LOGFILEW" is written according to the C syntax in the crate and I assign
+the name of the etw session in the correct syntax as well as the flags in the universal flag syntax. I don't understand however either what type of variable that EventRecordCallback
+is and why I assign it as stated above.
+
+Apparently it's declared as follows in the crate:
+
+"
+pub EventRecordCallback: Option<
+    unsafe extern "system" fn(*mut EVENT_RECORD)
+>,
+"
+
+Option< ... > - Means that whatever is declared inside of its' scope is optional and it can also just be none, assigning a variable to an "Option<...>" must be done with "Some(...)"
+as shown on line 648. "Some(...)" isn't used to declare the two other obligatory variables because the flag is always an integer, even if all of it's flags are off it's an integer
+showing 0 and there has to be an etw session name so there is no option for it to be null either.
+
+unsafe extern "system" fn(*mut EVENT_RECORD) - Means that the option other than nothing is a function following the system syntax and with the argument of a pointer to struct
+EVENT_RECORD which.. is a struct that follows the system syntax as well but not because it has to be to communicate with the system but because it comes from the system
+
+So onto making the string that is to be the name of the etw session that I'll be consuming. So apparetnly the weirdly placed W at the end of for instance EVENT_TRACE_LOGFILE happens
+to explain what type of string the function or struct uses. In this case, the W stands for wchar_t which is a type that takes up 16 bits of space in C and is short for "wide
+character type" and takes up twice as many bits as a normal char. The entire string isn't stored in the wchar_t however, only the first letter, therefore you pass a pointer to the
+first character of the string in memory into LoggerName and then etw will keep reading those wide characters until it reaches a null terminator, aka. an empty memory to mark the end
+of the string. To make said string in C wchar_t syntax in Rust I run:
+
+"
+let session_name: Vec<u16> = "MyEtwSession"
+    .encode_utf16()
+    .chain(std::iter::once(0))
+    .collect();
+"
+
+Which is pretty interesting. The simple part is defing a vector of type u16, and each wchar_t in C works like a u16 in Rust. The following things are basically method calls on
+that string before it is stored inside of the Vec<16>.
+
+But a string obviously can't be directly stored inside of a Vec<16>, so I call another method on the string to modify it so that it it is converted into the utf16 format (UniCode
+Transformatoin Format).
+
+The only thing missing for C to be able to read it is the null terminator at the end which is fixed by the ".chain(std::iter::once(0))" which chains one extra 0 at the end.
+
+And then to finalize the variable, you run ".collect();" to store the iterated value as the type which was initially declared, in this case a Vec<u16>.
+
+This is interesting as it exposes low-level memory-representation for something as simple as declaring a string, fundemental because of interacting with other languages in FFI.
+
+And to finally assign this beautiful string to the struct:
+
+"
+my_logfile.LoggerName = etw_session_name.as_ptr();
+"
+
+Simply meaning the address of the string in memory
 

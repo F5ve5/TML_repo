@@ -1,14 +1,22 @@
 use windows::Win32::System::Diagnostics::Etw;
-use windows::core::PWSTR;
 
-fn main() {
-    unsafe {
-        extern "system" fn callback(event_record: *mut EVENT_RECORD) {
-            // callback body
-        }
+extern "system" fn my_callback(event_data: *mut EVENT_RECORD){
+    println!("Event recieved!")
+}
 
-        let mut logfile = EVENT_TRACE_LOGFILEW::default();
+fn main(){
+    let mut my_logfie = EVENT_TRACE_LOGFILEW::default();
 
-        logfile.EventRecordCallback = Some(callback);
-    }
+    my_logfile.EventRecordCallback = Some(my_callback);
+
+    my_logfile.ProcessTraceMode =
+    PROCESS_TRACE_MODE_REAL_TIME |
+    PROCESS_TRACE_MODE_EVENT_RECORD;
+
+    let etw_session_name: Vec<16> = "ETWSESSIONNAME"
+    .encode_utf16()
+    .chain(std::iter::once(0))
+    .collect();
+
+    my_logfile.LoggerName = etw_session_name.as_ptr();
 }
