@@ -705,3 +705,17 @@ my_logfile.LoggerName = etw_session_name.as_ptr();
 
 Simply meaning the address of the string in memory
 
+260712
+
+2 hours later, been coding for a little while without logging.
+
+I'm done configuring the logfile and I have sent it in, also created a new script called misc.rs and made a function which converts strings from the Rust format into the C format.
+
+Oh yeah I also had to include another "module" in the crate I guess you call it, to get the EVENT_TRACE_LOGFILEW struct. Took a while to solve, but now I know the error for it
+
+Besides that I've also learned about "unions" in C, which are basically variables which could be different types and you can access them like you would any other variable of a
+struct in C but in Rust you have to explicitly reference the union as well
+
+The next step is kinda foggy right now but I guess it would be starting an etw session and trying to connect my code to it, maybe even configuring the a scheduled session at boot
+time and having it write into an .etl file which I'll then configure reading for myself. I think working with the data is going to come quite late and it's at that point that I'll
+know what more to do besides the minimal setup I have going at the moment.
