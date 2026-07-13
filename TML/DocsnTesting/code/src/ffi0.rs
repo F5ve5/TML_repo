@@ -9,7 +9,7 @@ pub fn get_trace_handle(session_name: &[u16]) -> PROCESSTRACE_HANDLE {
     
     let mut my_logfile = EVENT_TRACE_LOGFILEW::default();
 
-//(Pointer to Wide character STRing)
+//PWSTR = Pointer to Wide character STRing
     my_logfile.LoggerName = PWSTR(session_name.as_ptr() as *mut u16);
 
     my_logfile.Anonymous2.EventRecordCallback = Some(my_callback);

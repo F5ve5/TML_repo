@@ -719,3 +719,14 @@ struct in C but in Rust you have to explicitly reference the union as well
 The next step is kinda foggy right now but I guess it would be starting an etw session and trying to connect my code to it, maybe even configuring the a scheduled session at boot
 time and having it write into an .etl file which I'll then configure reading for myself. I think working with the data is going to come quite late and it's at that point that I'll
 know what more to do besides the minimal setup I have going at the moment.
+
+-----
+
+Having configured the minimum etw consumer, it's time to figure out the etw session
+
+For now I'll just be trying to start one normally but later I'll try to schedule one for the following boot.
+
+So a session is simply "a kernel object handled by windows". It has a name, a handle, a few settings and zero or more enabled providers (the "notifications" that etw recieves)
+
+Okay so it seems that practically the most important thing for me to cover right now is the struct EVENT_TRACE_PROPERTIES and how to set it up. I'm glad I did the consumer part
+first because this one seems a lot more complicated at first glance at least.
