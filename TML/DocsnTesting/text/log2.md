@@ -730,3 +730,45 @@ So a session is simply "a kernel object handled by windows". It has a name, a ha
 
 Okay so it seems that practically the most important thing for me to cover right now is the struct EVENT_TRACE_PROPERTIES and how to set it up. I'm glad I did the consumer part
 first because this one seems a lot more complicated at first glance at least.
+
+260713
+
+So as told previously, there are clearly similarities between EVENT_TRACE_PROPERTIES and EVENT_TRACE_LOGFILEW. The difference is that the former is about configuring the session
+itself and the latter about configuring the connection between my code and the session. Another similarity is that I'll be calling a function in regard to that created struct
+and for the logfile that was OpenTraceW and for the properties it's going to be StartTraceW that I'll be using to "register" the struct to windows.
+
+Actually there seems to be another important struct when it comes to starting sessions, it is called "ENABLE_TRACE_PARAMETERS" and it takes on a very prolific role. It also
+mechanically has a function for passing it that is called EnableTraceEx2()
+
+If EVENT_TRACE_PROPERTIES is a (pretty advanced) radio which can access any frequency at once and passing it with StartTraceW is turning it on, EnableTraceEx2() is telling
+radio stations to broadcast to this radio and ENABLE_TRACE_PARAMETERS contains further, more advanced instructions about that particular broadcast.
+
+And the workflow of creating a session is going to be calling StartTraceW() with the trace-properties struct (EVENT_TRACE_PROPERTIES) and the configuring the events it is going to
+be tracing by separate EnableTraceEx2() calls with the trace-parameters struct (EVENT_TRACE_PARAMETERS).
+
+So lets' start with the trace-properties struct.
+
+Now the weird thing is that I'm not only passing the struct but a whole memory region which contains the struct among other things, the first thing I do is get the size of the
+struct in memory by using std::mem::size_of which gives the size of the member in bytes and then I make a buffer which is the size of it and then some
+
+"then some" being exactly the length of the name of the session that I am creating times two, don't ask me why yet
+
+And then what you do is the following line:
+
+"
+let properties = buffer.as_mut_ptr() as *mut EVENT_TRACE_PROPERTIES;
+"
+
+Which passes a pointer to the struct into the start of the buffer and because it's a fat pointer it also contains information about how to handle what it points at, if it just
+would've been left as "buffer.as_mut_ptr()" then interacting with the pointed at value would be like interacting with an individual byte, because the buffer is essentially a vector
+of empty bites as per;
+
+"
+let buffer = vec![0u8,buffer_size];
+"
+
+where "0u8" stands for "00000000" aka 8 bits aka one byte
+
+by then writing "as *mut EVENT_TRACE_PROPERTIES" you say to treat what the pointer is pointing at not as a byte but as a you guessed it trace-properties struct, and it's also a
+mutable reference because that's what "as_mut_ptr()" expects
+
