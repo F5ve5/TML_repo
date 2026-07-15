@@ -5,16 +5,16 @@ extern "system" fn my_callback(event_data: *mut EVENT_RECORD){
     println!("Event recieved!")
 }
 
-pub fn get_trace_handle(session_name: &[u16]) -> PROCESSTRACE_HANDLE {
+pub fn open_trace(session_name: &[u16]) -> PROCESSTRACE_HANDLE {
     
-    let mut my_logfile = EVENT_TRACE_LOGFILEW::default();
+    let mut logfile = EVENT_TRACE_LOGFILEW::default();
 
 //PWSTR = Pointer to Wide character STRing
-    my_logfile.LoggerName = PWSTR(session_name.as_ptr() as *mut u16);
+    logfile.LoggerName = PWSTR(session_name.as_ptr() as *mut u16);
 
-    my_logfile.Anonymous2.EventRecordCallback = Some(my_callback);
+    logfile.Anonymous2.EventRecordCallback = Some(my_callback);
 
-    my_logfile.Anonymous1.ProcessTraceMode =
+    logfile.Anonymous1.ProcessTraceMode =
     PROCESS_TRACE_MODE_REAL_TIME |
     PROCESS_TRACE_MODE_EVENT_RECORD;
 
@@ -26,5 +26,5 @@ pub fn get_trace_handle(session_name: &[u16]) -> PROCESSTRACE_HANDLE {
 //let &y = x;
 //let *z = x;
 //Here the ampersand will create a reference to x, while z will become where the unsigned integer 5 points in memory. So one works up, one works down.
-    return unsafe {OpenTraceW(&mut my_logfile)};
+    return unsafe {OpenTraceW(&mut logfile)};
 }

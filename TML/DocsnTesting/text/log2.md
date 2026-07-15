@@ -6,7 +6,7 @@ CreateToolhelp32Snapshot because WMI unnecessarily "wrapped up" and the latter i
 on the other hand is basically exactly what I was looking for, a low-level system-intergrated API which runs continously and returns
 lots of rich data.
 
-And I chose Rust for the language because I wanted to.
+And I chose Rust for the language because I wanted to (even though I've never used it before)
 
 260627
 
@@ -757,6 +757,7 @@ And then what you do is the following line:
 
 "
 let properties = buffer.as_mut_ptr() as *mut EVENT_TRACE_PROPERTIES;
+
 "
 
 Which passes a pointer to the struct into the start of the buffer and because it's a fat pointer it also contains information about how to handle what it points at, if it just
@@ -769,6 +770,65 @@ let buffer = vec![0u8,buffer_size];
 
 where "0u8" stands for "00000000" aka 8 bits aka one byte
 
-by then writing "as *mut EVENT_TRACE_PROPERTIES" you say to treat what the pointer is pointing at not as a byte but as a you guessed it trace-properties struct, and it's also a
-mutable reference because that's what "as_mut_ptr()" expects
+by then writing "as *mut EVENT_TRACE_PROPERTIES" you say to treat what the pointer is pointing at not as a byte but as a you guessed it trace-properties struct, and it contains a
+second "mutable" because a mutable pointer is what the earlier ".as_mut_ptr()" expects to stay as.
 
+But the allocated memory region that is being pointed to is still empty. Luckily, the pointer to it which I just explained is mutable which means that I can edit the memory through
+it. Remember how I said that the size of the buffer in memory is the size of the trace-properties struct plus the length of the string that holds the name of the etw session I am
+creating times two? Well apparently it's because the buffer is supposed to be laid out the following way (creds to the big GPT):
+
+"
++----------------------------------+
+| EVENT_TRACE_PROPERTIES           |
++----------------------------------+
+| "MySession\0" (UTF-16)           |
++----------------------------------+
+| (optional log file name)         |
++----------------------------------+
+"
+
+And the pointer I've made makes it so that interacting with the first part of the buffer which takes on the length of EVENT_TRACE_PROPERTIES works the same as interacting directly
+with EVENT_TRACE_PROPERTIES which is hella convenient. Or not exactly the same you need to include lil brackets like this:
+
+"
+(*props).Wnode.BufferSize = buffer_size;
+"
+
+Because it's not the pointer itself that has the struct variables but the struct that it is referencing
+
+"
+*props.Wnode.BufferSize = buffer_size;
+"
+
+Would be an error because it'd be like modifying the pointer itself because it only contains an address and nothing else, contrary to my earlier belief that it also contained data
+on how to modify the referenced type though I now understand that that data comes from the struct itself. Further evaluating this idea, there aren't as many cases as I thought where
+fat pointers are actually needed, they ARE only necessary when the pointed to type doesn't contain enough information about size or usage or something like that.
+
+Anyways now that I've finished assinging the variables to the imaginary struct, it's time to assign the one other necessary thing at the moment to this memory region, the session
+name. This is done by first getting the pointer to the location that it is supposed to be in and then running the function:
+
+"
+std::ptr::copy_nonoverlapping(
+    session_name.as_ptr(),
+    string_ptr,
+    session_name.len(),
+);
+"
+
+Which is basically the same as this (in C# because idk for loops in Rust):
+
+"
+for (int i = 0; i < sessionName.Length; i++)
+{
+    stringPtr[i] = sessionName[i];
+}
+"
+
+where the indexes' of stringPtr refer to the amount of u16 from the start of it and the indexes in sessionName are the character in that space of the word.
+
+260714
+
+So coding-time-wise I am pretty much at the ten hour mark right now since I started using hackatime at least and only up to ten hours count towards the actual "ship payout" per devlog
+so I'm not sure whether I should keep coding and logging until I reach a coherent "checkpoint" or if I should write the devlog about where I am right now.
+
+I think the best option is to make it so that my code does what it's supposed to right now which is simply to 
