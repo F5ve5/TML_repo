@@ -831,4 +831,107 @@ where the indexes' of stringPtr refer to the amount of u16 from the start of it 
 So coding-time-wise I am pretty much at the ten hour mark right now since I started using hackatime at least and only up to ten hours count towards the actual "ship payout" per devlog
 so I'm not sure whether I should keep coding and logging until I reach a coherent "checkpoint" or if I should write the devlog about where I am right now.
 
-I think the best option is to make it so that my code does what it's supposed to right now which is simply to 
+I think the best option is to make it so that my code does what it's supposed to right now which is simply to
+
+260715
+
+Aaaannd I fell asleep, anyways two big milestones today:
+
+I posted my first devlog on stardance !! Even though I had to post like 5 times because my initial devlog was too long and then I had to mess with the formatting and aahrarhab
+
+But it's okay. Because my code successfully created an ETW session !!! After messing around a little bit with the StartTraceW() script it's actually running :D
+What I remember from the "messing around" is understanding the difference between pointers * and references & further, for example this makes sense:
+
+"
+*mut CONTROLTRACE_HANDLE
+"
+
+but not this:
+
+"
+*mut handle
+"
+
+Because a mutable pointer to a place in memory is supposed to provide information on how to interact with that space, not on what variable is at it. Explaining why it's a "raw" pointer.
+References on the other hand work the other way around, they "point to" explicit variables. And if a function expects a pointer as an argument, passing a reference is fine as well as
+Rust is able to convert it because the variable that a reference is referencing also reveals the type that it is, thus what type of pointer that the reference should become.
+
+Next up, StartTraceEx2();
+What the function is supposed to do is enable an event provider for me etw session, the function call looks something like this:
+
+"
+EnableTraceEx2(
+    handle,
+    &SystemTraceControlGuid,
+    EVENT_CONTROL_CODE_ENABLE_PROVIDER,
+    TRACE_LEVEL_INFORMATION,
+    EVENT_TRACE_FLAG_PROCESS,
+    0,
+    0,
+    null(),
+);
+"
+
+Which contains quite a bit more arguments than the functions I've written before, here's a summary of them:
+
+handle - the handle that I get from StartTraceW() presumably.. Yup I was right, so it's the handle that I get to the session that I crate, makes sense
+
+&SystemTraceControlGuid - A little whacky but this is a reference to a GUID which explains the category of events that I want my session to recieve, so because I want to recieve events
+from the windows-kernel-process-provider I pass the GUID of basically "kernel providers"
+
+EVENT_CONTROL_CODE_ENABLE_PROVIDER - I doubt there's a bigger fish, basically explains what I want that provider to have to do with my session, in this case it's to enable it. And yeah
+it's not a type but a constant, a flag. Same as how every other variable in here isn't actually a variable but the rough value that I want to assign to the parameter in my case
+
+TRACE_LEVEL_INFORMATION - The "verbosity" of the info I want to recieve, like how detailed I want it to be
+
+EVENT_TRACE_FLAG_PROCESS - Only at this stage is it specified that I want to recieve events from solely windows-kernel-process-provider
+
+The 0, 0 null() at the end are just additional settings that I don't need to mess with right now, it's a little reassuring though since it tells me that I am actually making something
+grounded which I can cultivate understandingly later on.
+
+Now even though I've said that the above function is made to enanble the process tracer provider, I think a better approach would be to enable the file tracing provider at first, as I
+think that it would allow for easier debugging because there's presumably less files than processes being created and destroyed at any given moment. So I can just start my trace and then
+create a text file or something and see if my callback function is called to make sure everything works as expected.
+
+Don't think I've ever seen this many red lines one after another, well all of the constans autocorrected so those exist, hovering over the function it seems to mostly point out incorrect
+types. It's a little confusing though since the constants have types that also sound like constants, like TRACE_LEVEL_INFORMATION is a bad example because it's just u32 but 
+EVENT_CONTROL_CODE_ENABLE_PROVIDER has type ENABLECALLBACK_ENABLED_STATE, SystemTraceControlGuid has windows_core::GUID or more specifically
+windows_core::GUID::from_u128(0x9e814aad_3204_11d2_9a82_006008a86939); and so on. Real messy.
+
+Got rid of the errors by learning a new way to convert types. Basically if something is assigned as a struct in the windows crate but really just contains a single int which is what the
+function that I am calling expects I can run SOME_WINDOWS_STRUCT.0 <- to get that int and then I can cast it to u8, u32, u64 as usual.
+
+The reason that there are structs which just contain a single variable is not because of some mistake that the crate made translating the windows syntax, it's for the sake of the structs
+working as something called "wrappers" or something like that and they exist so that you're not handling a bunch of different integers which you have to keep track of. Like imagine if
+you had:
+
+"
+let important_data_1: u32
+let important_data_2: u32
+let important_data_3: u32
+...
+"
+
+you'll probably mix them up, but if each type of important data has a distinct struct type like:
+
+"
+let important_data_1: structx
+let important_data_2: structy
+let important_data_3: structz
+...
+"
+
+where every struct is just
+
+"
+structx{
+    int: u32
+}
+"
+
+then they're way easier to keep track of since you know, you can look at both the variable and the type and know what it is
+
+And something cool is that a u32 and the a struct that only contains a u32 often look the same in memory, so it's just the way that you're accessing them that is different. It's just
+for Rust being so security-tight that you can't use structx in the place of a u32 and instead have to call structx.0 to access its' first field.
+
+It seems that there has been a misconception on my end regarding how windows calls my function. It can't just call it directly because it's public and it has the pointer to it.
