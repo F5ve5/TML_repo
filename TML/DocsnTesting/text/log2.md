@@ -935,3 +935,102 @@ And something cool is that a u32 and the a struct that only contains a u32 often
 for Rust being so security-tight that you can't use structx in the place of a u32 and instead have to call structx.0 to access its' first field.
 
 It seems that there has been a misconception on my end regarding how windows calls my function. It can't just call it directly because it's public and it has the pointer to it.
+
+260716
+
+Alot on unlogged work yesterday. Mostly because I'm struggling to understand how windows is accessing my function now that I've gotten to that point, as well as how it plays in with
+everything else.
+
+I think now that my code should be able to create a session, enable providers for it and listen to it that I should write down the mechanics for myself.
+
+1. So the first thing I do is just write the name of the session that I want to start
+
+2. Then I give that name to my function that creates a session which it does by allocating a buffer and then filling it with the equivalent of a struct as well as the name of my session
+and "optionally" the name of the file that it's supposed to write its' data into, and that "optionality" is configured by the contents of the struct. My function then passes that buffer
+to windows.I pass a buffer and not a struct because it's more optional or whatever. Also, the function returns a handle to the session which will later be used to modify it.
+
+3. I then also give the session name that creates a consumer for the created session, it's more simple, I just create a struct and pass it with a function instead of a buffer. I guess
+that it's more simple because of the principle, it just listens to a configured session so it does not have to be as complicated. The only things that the struct contains are the name of
+the session it's connecting to, a flag to configure what version of the session it is whether it's live or not and how modern it is and more importantly a pointer to one of my functions
+that will be used later.
+
+3 and 4 should probably switch places but whatever it works like this
+
+4. I enable a provider for my session my passing my session handle into a function which only returns a message whether starting it was successful or not. No passing structs here but still
+quite a lot of parameters on the function I'm using. The parameters pretty much consist of an unusally complex convention for getting the provider that I want as well as something that can
+be optionally assigned in order to determine after how long the proivider is gonna stop sending notifications. So this basically modifies the etw process that I've already opened.
+
+5. I guess this is the part that I am confused by. If I had to guess I would say that it's about configuring the existing listener session opened by opentracew or more like making it do
+something. It works by passing the consumer handle into another function (as with step 2 together with step 4). The main thing that confounded me was how windows doesn't actually directly
+call my function through its' pointer that I passed with opentracew, rather another function in my code that I am supposed to write called ProcessTrace() which is another linked function
+USES the pointer that I passed beforehand in order to call my own function that receives the etw data, and something else perplexing about ProcessTrace() is that when I put its' decelaration
+in my code it obiously links towards its' definition BUT because that definition consists of a while loop, ProcessTrace() now also works as a while loop in my code. And what that while
+loop does is check the receiver of events created by OpenTraceW() every loop for new updates and when it does receive updates, it both sends a little status message on its' own and also
+calls my function with the EVENT_DATA that it itself received.
+
+A summary would be:
+
+1. Write session name -- (Just declare a string)
+
+2. Configure and create session once with session name - get session handle -- (Pass buffer containing EVENT_TRACE_PROPERTIES layout + offset of the string since start of buffer + optionally
+file name string ++ an additional argument containing an additional reference to session name location, technically unnecessary but windows is old ++ an additional argument containing a
+pre-declared empty handle StartTraceW() - get the now-defined session handle CONTROLTRACE_HANDLE back as well as a status message)
+
+3. Configure and enable providers once for session using session handle -- (Pass arguments regarding which provider and its' verbosity as well as handle of the session its' supposed to provide
+to through EnableTraceEx2() - receives status message)
+
+4. Configure and create session-listener once for session with session name - get listener handle -- (Pass defaulted struct EVENT_TRACE_LOGFILEW with necessary values defined to OpenTraceW() -
+get PROCESSTRACE_HANDLE consuimer-handle back and no status message since the handle is the return)
+
+5. Continuously get information from session-listener using its' handle -- (Pass consumer-handle and optionally other arguments regarding the period it's supposed to send notifications through
+ProcessTrace() which is a loop that call my function with the EVENT_DATA parameter fulfilled - ProcesTrace() also returns a status message each time it recieves an event)
+
+(6.) Change or end the session afterwards using the session handle -- (By passing my session handle and what I want to change to ControlTraceW() - probably also returns an status message but
+I haven't used it yet)
+
+Additionally, more than one consumer can be active for a session at a time which wuld require stage 4 and 5 for each of them
+
+-----
+
+Now I've set debug prints across my code that work like this:
+
+#1 containing starttrace status message and session handle
+
+#2 containing enableprovider status message
+
+#3 containing opentrace consumer handle
+
+Then the processtrace status code along with hopefully a print from my callback function as well to confirm that its' been called
+
+--
+
+I'm getting status message 0 from the first thing I do which is creating the session, that error means that my code doesn't have permission to create a session which makes it weird how that
+part worked on the school laptop but whatever
+
+So how do I solve this? Just run cmd as admin.
+
+-
+
+Which I did and now everything is working except for that ProcessTrace isn't firing.
+
+Could be because I enabled the wrong trace if even a valid trace at all, the Rust formatting on that part was really tricky so that'd be my guess. To be clear, the trace I wanted to enable
+was the one that sends a notification each time a file is created or deleted and I did create and delete a file and got nothing from ProcessTrace().
+
+I'm even sure that the above is the reason because enabletraceex2 happens to be able to still return status message 0 even if it enabled a non-existent provider I guess because it did so for
+a session that does exist. Or I'm not sure if it can actually literally enable a provider that doesn't exist but the syntax for doing it is complicated to say the least and you don't get to
+know much from what the function for it returns. I guess cause calling it is really open-ended
+
+So imma try some different providers
+
+-
+
+Tried the .NET provider and IT WORKS !!! So the enabletrace call for the file kernel provider was probably incorrect, I also tried the kernel process provider and it didn't work either. From
+what I understand, calling kernel-level providers requires more fields to be filled in the enabletrace functiont than calling "regular" providers like the .NET one, so that extra step is
+probably related to why it's failing
+
+Oh and also the println!() that I placed in the function containing processtrace never fires because it's AFTER processtrace which is a LOOP. Silly me.
+
+So now to figure out how to enable provider that I want
+
+-
+

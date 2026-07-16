@@ -5,10 +5,10 @@ pub fn open_trace(session_name: &[u16]) -> PROCESSTRACE_HANDLE {
     
     let mut logfile = EVENT_TRACE_LOGFILEW::default();
 
-//PWSTR = Pointer to Wide character STRing
+//PWSTR = Pointer to Wide character STRing - and yes a pointer to it is equivalent to a pointer to the first letter of the string
     logfile.LoggerName = PWSTR(session_name.as_ptr() as *mut u16);
 
-    logfile.Anonymous2.EventRecordCallback = Some(my_callback);
+    logfile.Anonymous2.EventRecordCallback = Some(gimme_eventdata);
 
     logfile.Anonymous1.ProcessTraceMode =
     PROCESS_TRACE_MODE_REAL_TIME |
@@ -25,18 +25,19 @@ pub fn open_trace(session_name: &[u16]) -> PROCESSTRACE_HANDLE {
     return unsafe {OpenTraceW(&mut logfile)};
 }
 
-pub fn process_trace(session_handle: PROCESSTRACE_HANDLE) {
+pub fn trace_loop(consumer_handle: PROCESSTRACE_HANDLE) {
     unsafe {
         let result = ProcessTrace(
-            &[session_handle],
+            &[consumer_handle],
             None,
             None
         );
 
         println!("processtrace message: {:?}", result);
+        println!();
     }
 }
 
-extern "system" fn my_callback(_event_data: *mut EVENT_RECORD){
-    println!("Event recieved in callback function!")
+extern "system" fn gimme_eventdata(_event_data: *mut EVENT_RECORD){
+println!("AAA")
 }

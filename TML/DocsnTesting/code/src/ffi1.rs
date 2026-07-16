@@ -1,6 +1,7 @@
 use windows::Win32::System::Diagnostics::Etw::*;
 use windows::core::PCWSTR;
 use std::mem::size_of;
+use windows::core::GUID;
 
 pub fn start_session(session_name: &[u16]) -> CONTROLTRACE_HANDLE {
 
@@ -14,10 +15,10 @@ pub fn start_session(session_name: &[u16]) -> CONTROLTRACE_HANDLE {
     let props = buffer.as_mut_ptr() as *mut EVENT_TRACE_PROPERTIES;
 
 //Weirdly, I have to declare the handle beforehand and pass it to the function later instead of the function retungin a handle
-    let mut handle: CONTROLTRACE_HANDLE = CONTROLTRACE_HANDLE::default();
+    let mut session_handle: CONTROLTRACE_HANDLE = CONTROLTRACE_HANDLE::default();
 
 //This reference only exists because the function for whatever reason won't let me pass &handle directly
-    let handle_ref: *mut CONTROLTRACE_HANDLE = &mut handle;
+    let session_handle_ref: *mut CONTROLTRACE_HANDLE = &mut session_handle;
 
 unsafe{
     (*props).Wnode.BufferSize = buffer_size as u32;
@@ -27,7 +28,8 @@ unsafe{
     (*props).Wnode.Flags = WNODE_FLAG_TRACED_GUID;
 //And this flag is for saying that it's data is to be streamed live rather than fed into a file or "circular" or whatever the other options were
     (*props).LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
-
+//This field definitely seems weird at first because like why doesn't windows know the size of the struct it's reading? The answer is that it's once again because windows is old, or more
+//precisely because the size of the struct and the things within it has changed over time while etw and what it expects to receive has not.
     (*props).LoggerNameOffset = etp_size as u32;
  
 //Cool little line. When commenting I am always referring to the code below btw
@@ -53,28 +55,31 @@ unsafe{
     session_name.len(),
     );
 
-    let stw_msg = StartTraceW( handle_ref, PCWSTR(session_name.as_ptr()), props);
+    let stw_msg = StartTraceW( session_handle_ref, PCWSTR(session_name.as_ptr()), props);
    
+    print!("1:");
     println!("Message from starttrace: {:?}", stw_msg );
-    println!("Its' handle: {:?}", handle);
+    println!("Session handle from starttrace: {:?}", session_handle);
+    println!();
 }
 
-return handle;
+return session_handle;
 }
 
-pub fn enable_provider(session_handle: CONTROLTRACE_HANDLE){
+pub fn enable_session_provider(session_handle: CONTROLTRACE_HANDLE){
     unsafe{
         let etx_msg = EnableTraceEx2(
-            session_handle,
-            &SystemTraceControlGuid,
-            EVENT_CONTROL_CODE_ENABLE_PROVIDER.0,
-            TRACE_LEVEL_INFORMATION as u8,
-            EVENT_TRACE_FLAG_FILE_IO.0 as u64,
-            0 as u64,
-            0 as u32,
-            None
-        );
-
+    session_handle,
+    &GUID::from_u128(0xe13c0d23_ccbc_4e12_931b_d9cc2eee27e4),
+    EVENT_CONTROL_CODE_ENABLE_PROVIDER.0,
+    TRACE_LEVEL_INFORMATION as u8,
+    0,     // no kernel flags
+    0,
+    0,
+    None
+);
+            println!("3:");
             println!("Message from enableprovider: {:?}", etx_msg);
+            println!();
     }
 }  
