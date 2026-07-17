@@ -69,15 +69,15 @@ return session_handle;
 pub fn enable_session_provider(session_handle: CONTROLTRACE_HANDLE){
     unsafe{
         let etx_msg = EnableTraceEx2(
-    session_handle,
-    &GUID::from_u128(0xe13c0d23_ccbc_4e12_931b_d9cc2eee27e4),
-    EVENT_CONTROL_CODE_ENABLE_PROVIDER.0,
-    TRACE_LEVEL_INFORMATION as u8,
-    0,     // no kernel flags
-    0,
-    0,
-    None
-);
+            session_handle,
+            &SystemTraceControlGuid,
+            EVENT_CONTROL_CODE_ENABLE_PROVIDER.0,
+            TRACE_LEVEL_INFORMATION as u8,
+            EVENT_TRACE_FLAG_PROCESS.0 as u64,
+            0 as u64,
+            0 as u32,
+            None
+        );
             println!("3:");
             println!("Message from enableprovider: {:?}", etx_msg);
             println!();

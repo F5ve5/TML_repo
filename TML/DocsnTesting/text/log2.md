@@ -1032,5 +1032,29 @@ Oh and also the println!() that I placed in the function containing processtrace
 
 So now to figure out how to enable provider that I want
 
+--
+
+GeePeeTee just dropped a massive bomb on me now that I can use the better model again. The issue isn't that I'm calling EnableTraceEx2 with the incorrect arguments, it's that;
+
+I'm defining the buffer for StartTraceW() in the old school way, windows xp era type sh*t and back then ETW was only meant to dispatch events from a few different kernel providers which were
+assigned INSIDE OF THE BUFFER in the EVENT_TRACE_PROPERTIES region. Because what need would there be to enable providers by GUID with a separate function if there are only under a dozen of them
+when you could just make it so that they're enabled along with the session?
+
+But then why did the .NET provider still work if I am using this old framework? Probably because EnableTraceEx2() was created to enable providers other than the main kernel processes.
+
+But then why did geepiddydiddy give me a GUID for a kernel provider? Probably because EnableTraceEx2() was later expanded to cover kernel processes as well.
+
+Checking and I was basically right
+
+So should I go with the old school way of enabling the corresponding flags in the buffer for the kernel process provider or the new school way of using EnableTraceEx2()?
+
 -
+
+Even though it's more complicated, I think I'm gonna go with the second way as it obviously gives my project more potential, it revolving around ETW and all
+
+To create a session that uses EnableTraceEx2 for kernel providers, I have to enable this flag to the pointer EVENT_TRACE_PROPERTIES in the buffer for StartTraceW:
+
+"
+(*props).LogFileMode = EVENT_TRACE_SYSTEM_LOGGER_MODE;
+"
 
