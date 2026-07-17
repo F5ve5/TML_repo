@@ -33,13 +33,3 @@ pub fn build_logfilew(name: &str){
 
 ///
 
-EnableTraceEx2(
-            session_handle,
-            &SystemTraceControlGuid,
-            EVENT_CONTROL_CODE_ENABLE_PROVIDER.0,
-            TRACE_LEVEL_INFORMATION as u8,
-            EVENT_TRACE_FLAG_PROCESS.0 as u64,
-            0 as u64,
-            0 as u32,
-            None
-        );

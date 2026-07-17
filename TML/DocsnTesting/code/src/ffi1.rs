@@ -26,6 +26,10 @@ unsafe{
 //Quite a PROLIFIC flag indeed (Love that word)
 //Other flags in this field mostly signal to windows that the buffer is to be used for other things similar to etw, to my understanding at least.
     (*props).Wnode.Flags = WNODE_FLAG_TRACED_GUID;
+//Classic flags
+    (*props).EnableFlags =     EVENT_TRACE_FLAG_PROCESS |
+    EVENT_TRACE_FLAG_THREAD;
+    (*props).Wnode.Guid = SystemTraceControlGuid;
 //And this flag is for saying that it's data is to be streamed live rather than fed into a file or "circular" or whatever the other options were
     (*props).LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
 //This field definitely seems weird at first because like why doesn't windows know the size of the struct it's reading? The answer is that it's once again because windows is old, or more
@@ -60,14 +64,19 @@ unsafe{
     print!("1:");
     println!("Message from starttrace: {:?}", stw_msg );
     println!("Session handle from starttrace: {:?}", session_handle);
+    println!("Guid: {:?}", (*props).Wnode.Guid);
+println!("Flags: {:?}", (*props).Wnode.Flags);
+println!("Mode: {:?}", (*props).LogFileMode);
+println!("Enable: {:?}", (*props).EnableFlags);
     println!();
-}
+    }
 
 return session_handle;
 }
 
-pub fn enable_session_provider(session_handle: CONTROLTRACE_HANDLE){
-    unsafe{
+pub fn enable_provider(session_handle: CONTROLTRACE_HANDLE){
+
+        unsafe{
         let etx_msg = EnableTraceEx2(
             session_handle,
             &SystemTraceControlGuid,
@@ -81,5 +90,5 @@ pub fn enable_session_provider(session_handle: CONTROLTRACE_HANDLE){
             println!("3:");
             println!("Message from enableprovider: {:?}", etx_msg);
             println!();
-    }
-}  
+    }   
+}

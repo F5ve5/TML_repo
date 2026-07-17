@@ -1058,3 +1058,57 @@ To create a session that uses EnableTraceEx2 for kernel providers, I have to ena
 (*props).LogFileMode = EVENT_TRACE_SYSTEM_LOGGER_MODE;
 "
 
+260717 and I ended up trying to understand the classic logger mode instead because the modern one didn't really work, below is the setup I've changed so far:
+
+The following flags have been changed for etp in the buffer:
+
+"
+//Classic flags
+    (*props).EnableFlags = EVENT_TRACE_FLAG_PROCESS;
+    (*props).Wnode.Guid = SystemTraceControlGuid;
+"
+
+where .EnableFlags is said way of enabling kernel providers through the struct and Wnode.Guid is basically an identifies for what kind of session it is
+
+and besides that you need a specific session name when using the classic setup, namely "NT Kernel Provider" 
+
+At the moment I am receiving a bunch of notifications through my ProcessTrace and I don't know what they mean so I am pretty much fully using AI to understand them. I'm talking like
+
+"
+Opcode: 3, Version: 4, Task: 0, ID: 0 Opcode: 3, Version: 4, Task: 0, ID: 0 Opcode: 3, Version: 4, Task: 0, ID: 0
+"
+
+But it's actually according to the gameplan, understanding what these mean are for later. Right now all that I know is that I am in some way getting messages from the kernel process provider
+but that are slightly incomplete, like they're only control events and nothing actually informative right now. And it's like that because even if the buffer i pass for session data is slightly
+incorrect, it'll just run incorrectly rather than giving me an error which I guess is the consequence for working almost completely in unsafe fields.
+
+Nothing has really changed in the OpenTraceW function or ProccesTrace though even when switching to the classic kernel provider method which is nice
+
+-
+
+Something that I can notice personally about the events that I am getting is that they appear in a burst of hundreds of notifications when I start the session and then like 5 happen over the
+following 10 seconds or so and then it just goes quiet even when I am starting processes (which it is suppoed to track). What does this mean besides possibly what I stated above? Still don't
+really know.
+
+--
+
+Okay I think ChatGPT is trolling but my code works now, after:
+
+- Changing the provider from just the kernel process provider to both it and the provider for new threads by changes the flags in the buffer struct
+Which I don't think did more than it sounds like
+
+- Also printing "UserDataLength" which I haven't done before but it made gpt convinced that a line that I changed like half an hour ago was the thing that fixed my code while it was probably
+just printing the thing that actually shows that my code works
+
+So this is what I changed to in the said struct buffer:
+
+"
+    (*props).EnableFlags =     EVENT_TRACE_FLAG_PROCESS |
+    EVENT_TRACE_FLAG_THREAD;
+    (*props).Wnode.Guid = SystemTraceControlGuid;
+"
+
+instead of what's a little further up
+
+---
+

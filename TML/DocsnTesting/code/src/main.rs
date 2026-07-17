@@ -3,7 +3,7 @@ mod ffi1;
 mod misc;
 
 pub fn main() {
-    let session_name_r: &str = "ETWWW";
+    let session_name_r: &str = "NT Kernel Logger";
     let session_name_c: Vec<u16> = misc::r_to_cstring(session_name_r);
 
     let session_handle = ffi1::start_session(&session_name_c);
@@ -11,6 +11,6 @@ pub fn main() {
     println!("2:");
     println!("Consumer handle from opentrace: {:?}", consumer_handle);
     println!();
-    ffi1::enable_session_provider(session_handle);
     ffi0::trace_loop(consumer_handle);
+    ffi1::enable_provider(session_handle);
 }

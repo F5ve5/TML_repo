@@ -39,5 +39,16 @@ pub fn trace_loop(consumer_handle: PROCESSTRACE_HANDLE) {
 }
 
 extern "system" fn gimme_eventdata(_event_data: *mut EVENT_RECORD){
-println!("AAA")
+
+    unsafe{
+        println!(
+    "Opcode: {}, Version: {}, Task: {}, ID: {}, payload size: {}",
+    (*_event_data).EventHeader.EventDescriptor.Opcode,
+    (*_event_data).EventHeader.EventDescriptor.Version,
+    (*_event_data).EventHeader.EventDescriptor.Task,
+    (*_event_data).EventHeader.EventDescriptor.Id,
+    (*_event_data).UserDataLength
+    );
+    }
+        
 }
