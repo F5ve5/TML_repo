@@ -1,7 +1,7 @@
 use windows::Win32::System::Diagnostics::Etw::*;
 use windows::core::PCWSTR;
 use std::mem::size_of;
-use windows::core::GUID;
+
 pub fn start_session(session_name: &[u16]) -> CONTROLTRACE_HANDLE {
 
     let etp_size = size_of::<EVENT_TRACE_PROPERTIES>();
@@ -13,14 +13,13 @@ pub fn start_session(session_name: &[u16]) -> CONTROLTRACE_HANDLE {
     let props = buffer.as_mut_ptr() as *mut EVENT_TRACE_PROPERTIES;
 
     let mut session_handle: CONTROLTRACE_HANDLE = CONTROLTRACE_HANDLE::default();
-
-    let session_handle_ref: *mut CONTROLTRACE_HANDLE = &mut session_handle;
-
+    
 unsafe{
     (*props).Wnode.BufferSize = buffer_size as u32;
     (*props).Wnode.Flags = WNODE_FLAG_TRACED_GUID;
 
-    (*props).LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
+    (*props).LogFileMode = EVENT_TRACE_REAL_TIME_MODE |
+    EVENT_TRACE_SYSTEM_LOGGER_MODE;
 
     (*props).LoggerNameOffset = etp_size as u32;
  
@@ -34,7 +33,7 @@ unsafe{
     session_name.len(),
     );
 
-    let stw_msg = StartTraceW( session_handle_ref, PCWSTR(session_name.as_ptr()), props);
+    let stw_msg = StartTraceW( &mut session_handle, PCWSTR(session_name.as_ptr()), props);
    
     print!("1:");
     println!("Message from starttrace: {:?}", stw_msg );
@@ -52,13 +51,13 @@ pub fn enable_trace(session_handle: CONTROLTRACE_HANDLE){
     unsafe{
         let etx_msg = EnableTraceEx2(
     session_handle,
-    &provider as *const GUID,
-    EVENT_CONTROL_CODE_ENABLE_PROVIDER.0,
-    TRACE_LEVEL_VERBOSE as u8,
-    u64::MAX,
+    &SystemProcessProviderGuid,
+    EVENT_CONTROL_CODE_ENABLE_PROVIDER.0 as u32,
+    TRACE_LEVEL_INFORMATION as u8,
     0,
     0,
-    None
+    0,
+    None,
         );
             println!("3:");
             println!("Message from enableprovider: {:?}", etx_msg);

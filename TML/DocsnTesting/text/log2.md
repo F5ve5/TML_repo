@@ -854,14 +854,14 @@ but not this:
 
 Because a mutable pointer to a place in memory is supposed to provide information on how to interact with that space, not on what variable is at it. Explaining why it's a "raw" pointer.
 References on the other hand work the other way around, they "point to" explicit variables. And if a function expects a pointer as an argument, passing a reference is fine as well as
-Rust is able to convert it because the variable that a reference is referencing also reveals the type that it is, thus what type of pointer that the reference should become.
+Rust is able to convert it because the variable that a reference is referencing also reveals the type that it is, thus what type of pointer that the reference should become.                       REFNPOI
 
 Next up, StartTraceEx2();
 What the function is supposed to do is enable an event provider for me etw session, the function call looks something like this:
 
 "
 EnableTraceEx2(
-    handle,
+    handle,sdsds
     &SystemTraceControlGuid,
     EVENT_CONTROL_CODE_ENABLE_PROVIDER,
     TRACE_LEVEL_INFORMATION,
@@ -914,7 +914,7 @@ let important_data_3: u32
 
 you'll probably mix them up, but if each type of important data has a distinct struct type like:
 
-"
+"                                                                                                                                                                                   WRAPPERSSS
 let important_data_1: structx
 let important_data_2: structy
 let important_data_3: structz
@@ -941,7 +941,7 @@ It seems that there has been a misconception on my end regarding how windows cal
 Alot on unlogged work yesterday. Mostly because I'm struggling to understand how windows is accessing my function now that I've gotten to that point, as well as how it plays in with
 everything else.
 
-I think now that my code should be able to create a session, enable providers for it and listen to it that I should write down the mechanics for myself.
+I think now that my code should be able to create a session, enable providers for it and listen to it that I should write down the mechanics for myself.        ETWEXP
 
 1. So the first thing I do is just write the name of the session that I want to start
 
@@ -1113,3 +1113,34 @@ instead of what's a little further up
 ---
 
 And I didn't say so earlier but I do WANT to go with the modern version but atleast now I have something to fall back on incase it never starts working
+
+260718
+
+I've managed to get events coming using the modern session setup. The problem was likely that:
+
+I had to enable one additional flag within props in order to receive kernel events or rather to be allowed to use the kernel event GUID, the flag was:
+
+"
+| EVENT_TRACE_SYSTEM_LOGGER_MODE;
+"
+
+Which makes sense because enableprocess in the beginning was only for events other than the ones that could be enabled using flags like in the classic version, so they likely added a flag to
+props later that would allow enableproces to partake in kernel events as well. Basically marking the change from the classic session version to the modern one.
+
+But the provider enabling is so weird, you can't just give one GUID but you have to give a GUID and then narrow the events that you'll receieve down by using keywords, that are written into
+two different fields:
+
+matchallkeyword
+and
+matchanykeyword
+
+So I guess it's like if I'm in the roblox catalog and I want to search for a "blue glowing octopus":
+
+So there are three separate "tags" for what I am searching for which is "blue", "glowing" and "octopus", if I were to search using matchanykeyword then I would get all items with either one of
+the tags, so I would get everything from "blue jacket" to "glowing green eyes".
+
+But if I'd search using matchallkeyword then I would get just items that have all of the specific tags even though they might have more than just those, so I'll only get "blue glowing flying
+octopus" and "octopus on ship with glowing moon" which narrows it down a lot further as these would also have been included if I would've searched with matchanykeyword.
+
+More specifically, because both of them are appplied together, the matchallkeyword is applied first and then additionally the matchanykeyword to expand afterwards.
+
