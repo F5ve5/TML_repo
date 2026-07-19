@@ -15,3 +15,7 @@ Explanation of wrappers and how structs in windows sometimes store individual va
 
 ETWEXP log2
 Decent run-through and explanation of etw
+
+UIBEGNG log2
+Start of the UI segment of the project
+

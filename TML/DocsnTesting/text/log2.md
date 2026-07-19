@@ -1144,3 +1144,13 @@ octopus" and "octopus on ship with glowing moon" which narrows it down a lot fur
 
 More specifically, because both of them are appplied together, the matchallkeyword is applied first and then additionally the matchanykeyword to expand afterwards.
 
+260719 UIBEGNG
+
+Been reading a litle about ETW and something that stood out to me was that you pass a buffer to StartTraceW not just because it allows windows to start a session faster and more efficiently but
+to keep a call to ETW as grounded and simple as possible thanks to how fundemental of a feature it is.
+
+Now to start designing the dekstop application. I've heard of something called "Tauri" and how it's compatible with Rust, but the thing isn't that it replaces JavaScript/HTML/CSS so what does it
+do? Well it's kind of like a bridge between the front-end and the back-end and then some as I understand it right now. Then there also happens to be something called "egui" (easy graphical user
+interface) which matches my mental picture of a front-end much better, instead of using the earlier mentioned other languages, egui stays native to Rust while still letting you design buttons,
+graphics and such and according to the geept it's pretty much meant for the type of program I want to make. I don't have any experience in JavaScript/HTML/CSS so I think imma go with the latter.
+
