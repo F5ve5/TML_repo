@@ -1154,3 +1154,123 @@ do? Well it's kind of like a bridge between the front-end and the back-end and t
 interface) which matches my mental picture of a front-end much better, instead of using the earlier mentioned other languages, egui stays native to Rust while still letting you design buttons,
 graphics and such and according to the geept it's pretty much meant for the type of program I want to make. I don't have any experience in JavaScript/HTML/CSS so I think imma go with the latter.
 
+--
+
+So egui
+
+Taking it all from a very nutshelled perspective, egui is not a complete GUI framework in that it doesn't do things like create the window to draw inside of, receieve input, present pixels on the
+screen etc. basically all of the OS-specifc things is handled by a an addon to egui called eframe. But after the setup is done, the mathematics for drawing are universal and therefore it can work 
+the same on every platform.
+
+-
+
+How do I add it? Cargo.toml
+
+More speficially, I added the latest version of both eframe and egui, namely 0.35.0 of both since they're made for eachother.
+
+-
+
+As I said before, eframe handles the "OS-specific" low-level stuff. Like if I didn't use eframe I'd probably have to continue handling low-level interactions like before with ETW. I guess I could
+do the ui part a little more manually than this butI don't think it'll be as necessary because it's not really about missing out on parts of the data that my program revolves around anymore,
+besides I don't want to be drawing triangles for the next 2 months.
+
+--
+
+So to put simply what eframe and egui does, eframe starts by creating a window inside of windows (the os) and it keeps it alive in use of a while loop. Inside of the while loop is where egui acts 
+to determine what is drawn onto the screen in use of logic from both input, the backend etc.
+
+For how the logic in egui/eframe works; it mainly revolves around a struct, of course it does. However there is a difference between the design philosophy of js/css/html and egui/eframe, mainly 
+that the former is a retained mode GUI and the latter an immediate mode GUI; to elaborate on this, a retained mode gui generally relies on storing gui assets the same way as any other logic while
+immediate mode gui means to only store in memory what is currently being shown on screen, meaning that you could think of it as basically being renewed every frame because "gui is just an
+immediate cause of the underlying flow of logic" or even "gui is a picture of the programs' current state".
+
+260720
+
+Times flies
+
+So there's a struct and there's and update function
+
+And  "revolves around a struct" in that all of the back-end data it relies on is delivered through a singular struct which it runs ui functions on every frame in order to display them in the
+desired way. Similarily, mouse position, click position and keyboard input is detected automatically in the loop so that you can run something like:
+
+"
+if(struct.data.asbutton().hoveringover()){
+    struct.data.asbutton().playoveranim();
+}
+"
+
+Where asbutton(), hoveringover() and possibly even playovernim() (I'm unsure but probably something similar at least) are handled by egui
+
+On the other hand, eframe handles what has to happen inside of the system up until this point, such as OS-specific means for receiving input, starting a window etc. you get it.
+
+-
+
+I think I've explained the general picture enough times now, so to get to the code. The struct that you create which contains the backend data I've basically explained the principle of already,
+but for the block of code that comes inside of the structs scope:
+
+"
+impl eframe::App for MyApp {
+
+}
+"
+
+where MyApp is the struct obviously
+
+And eframe::App I guess is sort of an implementation to the existing struct, this "implementation" is called a trait and it's called a trait because of the fact that it tells the compiler to
+treat the thing that it refers to in a specific way, in this case it says to implement the struct behavior of App from eframe to my own struct and for that implementation to work, it has its'
+own scope in which is brings over the function necessary for that new behavior to be implemented and that new function is;
+
+"
+fn update(
+    &mut self,
+    ctx: &egui::Context,
+    frame: &mut eframe::Frame,
+) {
+
+}
+"
+
+260721
+
+Trying to understand impl and traits currently
+
+-
+                                                                                        TRAITSEXPLLL
+So an impl and a trait are two different things. An impl works like:
+
+"
+struct sheep {name: &'static str, is_naked: bool}
+
+impl Sheep{
+    fn speak(&self){
+        ("BAAHHHHH!")
+    };
+
+    fn get_wool(&mut self){
+        if(self.is_naked){
+            println!("Ayo I swear bruh I ain't got it on me!");
+        }else{
+            println!("Okay I gotchu! Just take it and leave me alone!");
+            self.is_naked = true;
+        }
+    }
+}
+"
+
+just adding whatever functions onto an existing struct while the function needs the &self parameter because yada-yada the compiler doesn't know that the implementation is for the sheep type
+yet and only functions can be added, not variables. Traits work together with impl:
+
+"
+trait MakeSelfConcious{
+    fn say_name(&self);
+}
+
+impl MakeSelfConcious for Sheep{
+    fn say_name(&self){
+        println!("What's up G, my name's {}", self.name);
+    }
+}
+"
+
+So the main thing is that a trait basically says what funcion declarations a 
+
