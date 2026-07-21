@@ -19,3 +19,6 @@ Decent run-through and explanation of etw
 UIBEGNG log2
 Start of the UI segment of the project
 
+TRAITSEXPLLL log2
+Explanation of impl and traits
+
