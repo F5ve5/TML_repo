@@ -480,20 +480,25 @@ running Cargo run in the driectory of my Cargo.toml file and src folder. I was m
 
 "
    Compiling proc-macro2 v1.0.106
-   Compiling quote v1.0.46                                                                                                                                                                                                                  
-error: linker `link.exe` not found                                                                                                                                                                                                          
+   Compiling quote v1.0.
+   46                                                                                                                                                                                                                  
+error: linker `link.exe` not 
+found                                                                                                                                                                                                          
   |
   = note: program not found
 
 note: the msvc targets depend on the msvc linker but `link.exe` was not found
 
-note: please ensure that Visual Studio 2017 or later, or Build Tools for Visual Studio were installed with the Visual C++ option                                                                                                            
+note: please ensure that Visual Studio 2017 or later, or Build Tools for Visual Studio were installed with the Visual C++ 
+option                                                                                                            
 
 note: VS Code is a different product, and is not sufficient
 
-error: could not compile `quote` (build script) due to 1 previous error                                                                                                                                                                     
+error: could not compile `quote` (build script) due to 1 previous 
+error                                                                                                                                                                     
 warning: build failed, waiting for other jobs to finish...
-error: could not compile `proc-macro2` (build script) due to 1 previous error                                                                                                                                                               
+error: could not compile `proc-macro2` (build script) due to 1 previous 
+error                                                                                                                                                               
 PS C:\Users\nora.svahn\Desktop\TML_repo\TML\DocsnTesting\code> 
 "
 
@@ -1271,6 +1276,16 @@ impl MakeSelfConcious for Sheep{
     }
 }
 "
+So a trait is basically a specific impl which makes it so that a struct satisifes the needs for a certain behavior, in the case I'm at right now the need is the update function and the
+behavior is being sent off to egui/eframe. Why I can't just initially define update when creating the struct is a little unclear but I know that "impl eframe::App for MyApp" gives MyApp a
+certain symbol which makes it possible for it to be passed to eframe afterwards, a symbol which doesn't appear if I just define MyApp with the correct function declarations from the start.
 
-So the main thing is that a trait basically says what funcion declarations a 
+Actually my bad, in Rust it is impossible to define functions when initially creating a struct, that does make it make more sense.
+
+Also, I believe that the reason for implementing a trait to one of my existing structs rather than sending off a complete struct/buffer like with ETW is to lend more control into my own hands
+regarding how my own data is supposed to behave inside of the update loop.
+
+-
+
+For the "sending off to eframe"
 
