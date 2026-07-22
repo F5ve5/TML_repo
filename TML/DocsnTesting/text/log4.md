@@ -22,3 +22,5 @@ Start of the UI segment of the project
 TRAITSEXPLLL log2
 Explanation of impl and traits
 
+OKNERREXPL log2
+Explanation of Result<T, E>

@@ -1244,7 +1244,7 @@ Trying to understand impl and traits currently
 So an impl and a trait are two different things. An impl works like:
 
 "
-struct sheep {name: &'static str, is_naked: bool}
+struct sheep {name: &'static str, got_wool: bool}
 
 impl Sheep{
     fn speak(&self){
@@ -1252,11 +1252,11 @@ impl Sheep{
     };
 
     fn get_wool(&mut self){
-        if(self.is_naked){
-            println!("Ayo I swear bruh I ain't got it on me!");
-        }else{
+        if(self.got_wool){
             println!("Okay I gotchu! Just take it and leave me alone!");
-            self.is_naked = true;
+            self.got_wool = true;
+        }else{
+            println!("Yo I swear I ain't got it on me!");
         }
     }
 }
@@ -1283,9 +1283,79 @@ certain symbol which makes it possible for it to be passed to eframe afterwards,
 Actually my bad, in Rust it is impossible to define functions when initially creating a struct, that does make it make more sense.
 
 Also, I believe that the reason for implementing a trait to one of my existing structs rather than sending off a complete struct/buffer like with ETW is to lend more control into my own hands
-regarding how my own data is supposed to behave inside of the update loop.
+regarding how my own data is supposed to behave inside of the update loop which takes place inside of the struct that I instead own.
 
 -
 
-For the "sending off to eframe"
+For the "sending off to eframe", it does work similarily to my earlier interactions with etw. I send over the struct along with a few other parameters as arguments through a function so that
+the main thing can interact with them. Running the linked function looks like this:
+
+"
+    let options = eframe::NativeOptions::default();
+
+    eframe::run_native(
+        "ETW Viewer",
+        options,
+        Box::new(|_cc| {
+            Ok(Box::new(MyApp {}))
+        })
+    ).unwrap();
+"
+
+There's a few things to.. unwrap here haha. The first line is creating a defaulted NativeOptions struct which means to just go with the default options regarding the App, then I pass:
+
+"ETW Viewer" - which is gonna be the name of the app in egui
+
+options - which is the defaulted struct I just explained
+
+Box::new(|_cc| {Ok(Box::new(MyApp {}))}) - so I'm creating an instance of the struct that I created and boxing it on the heap (which is a concept I've explored some time earlier)
+
+What do |_cc|, Ok() and unwrap() mean? One thing at a time:
+
+First for the Ok(), Rust has something called Result<T, E> which basically works as a return type for a function
+
+260722
+                                                            OKNERREXPL
+So the Result<T, E> type.
+
+The idea is that instead of returning a certain value of the return type of the function in order to signal that it failed its' operation, it returns a specific type in itself which here is
+"Error". The interesting thing is that both the successful return type and the failed one are both of their own distinct "type" and that type can be "unwrapped" in order to show only the
+value that was initially returned.
+
+The two different types Ok() and Err() (type T and type E/Error) are called "enums" and the basic premise of them is to basically serve as a "tag" or "label" on existing values in order to signal their role.
+
+So for example:
+
+"
+fn divide(a: f64, b: f64) -> Result<f64, &'static str> {
+    if b == 0.0 {
+        Err("cannot divide by zero")
+    } else {
+        Ok(a / b)
+    }
+}
+
+match divide(6.0, 2.0) {
+    Ok(value) => println!("Answer: {}", value),
+    Err(message) => println!("Error: {}", message),
+}
+"
+
+Here, the match operation is used to handle the two possible return types of the function. Where a Ok() return would signal a successful operation on the functions' behalf and Err() a failed one.
+
+--
+
+That concept covered, it seems fitting to explain the concept behind "unwrap()" next
+
+Because the function that I am sending my arguments to will return type Result<T, E>, unwrap() is one of the choices I can go with to distinguish the T variant from the E variant. What unwrap() does is basically
+crash the program and send an error message on what went wrong if an E type is returned
+
+I could also go with match instead of .unwrap() but the latter seems like the better option since it sends an automatic message on where in the code an error took place.
+
+--
+
+Now for the |_cc|
+
+So to explain the reason for the existence of these five characters first. It's that eframe needs time to create things like the window, the gpu backend, the egui context and storage systems before my struct becomes
+relevant. Therefore I do pass the struct itself but not as explicitly as passing it to ETW which has an immediate use for it as soon as it arrives, rather I pass an instruction on how to create one of my structs.
 
