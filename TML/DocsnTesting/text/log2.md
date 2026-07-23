@@ -1356,6 +1356,74 @@ I could also go with match instead of .unwrap() but the latter seems like the be
 
 Now for the |_cc|
 
-So to explain the reason for the existence of these five characters first. It's that eframe needs time to create things like the window, the gpu backend, the egui context and storage systems before my struct becomes
-relevant. Therefore I do pass the struct itself but not as explicitly as passing it to ETW which has an immediate use for it as soon as it arrives, rather I pass an instruction on how to create one of my structs.
+"
+fn main() {
+    let y = 10;
 
+    let add = |x| x + y;
+
+    println!("{}", add(5)); // 15
+}
+"
+
+Here, the definition for |x| is x + y where the argument x is added onto the earlier defined y. This is different from |_cc| where the argument isn't used but the main point is that the point of a closure is to
+complete the action of what's explained infront of it, in my case it's: 
+
+"
+Ok(Box::new(MyApp {})) 
+"
+
+The Ok is there just because the egui expects the close itself to return a Result<T, E> when ran. The next confusing part is what's left;
+
+"
+Box::new(MyApp {})
+"
+
+Like it'd make more sense if what was left was just creating an instance of the struct upon running the closure, but instead you box it(?)
+
+-
+
+Actually that does make sense since eframe will box it
+
+And I forgot to mention that the closure itself is also boxed, which sort of makes sense I guess
+
+I'd like to look at the declaration for this function to understand its' last parameter better
+
+"
+pub fn run_native(
+    app_name: &str,
+    native_options: NativeOptions,
+    app_creator: Box<
+        dyn FnOnce(
+            &CreationContext
+        ) -> Result<
+            Box<dyn App>,
+            Box<dyn Error + Send + Sync>
+        >
+    >
+) -> Result<(), Error>
+"
+
+so
+
+"
+    app_creator: Box<
+        dyn FnOnce(
+            &CreationContext
+        ) -> Result<
+            Box<dyn App>,
+            Box<dyn Error + Send + Sync>
+        >
+"
+
+Here I can see that the parameter requires a box which contains a function that can be ran once with the parameter of &CreationCotext which is equivalent to the |_cc| and that function is required to return another box
+which itself contains a struct with the App trait implemented, either that or an error. Now why the closure satisfies the FnOnce trait is weird but it has something to do with the fact that each closure is able to satisfy
+one or more of three different function traits.
+
+I hope I'll come to grasp this better later, the double boxing and all.
+
+---
+
+The natural next step is to establish communication between the received events and the ui
+
+I've heard that this is done through something called a "channel"
