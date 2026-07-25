@@ -49,7 +49,7 @@ return session_handle;
 
 pub fn enable_trace(session_handle: CONTROLTRACE_HANDLE){
     unsafe{
-        let etx_msg = EnableTraceEx2(
+let etx_msg = EnableTraceEx2(
     session_handle,
     &SystemProcessProviderGuid,
     EVENT_CONTROL_CODE_ENABLE_PROVIDER.0 as u32,
@@ -58,9 +58,7 @@ pub fn enable_trace(session_handle: CONTROLTRACE_HANDLE){
     0,
     0,
     None,
-        );
-            println!("3:");
-            println!("Message from enableprovider: {:?}", etx_msg);
-            println!();
+);
+println!("Message from enableprovider: {:?}", etx_msg);
     }   
 }
