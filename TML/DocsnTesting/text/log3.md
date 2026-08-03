@@ -151,3 +151,19 @@ EnableTraceEx2(
     0,
     None
 );
+
+////////////////////////////
+
+Opcode: 2, Version: 4, ID: 0, payload size: 413
+Opcode: 1, Version: 4, ID: 0, payload size: 446
+Opcode: 1, Version: 4, ID: 0, payload size: 250
+
+Opcode: 1, Version: 4, ID: 0, payload size: 250
+
+Opcode: 2, Version: 4, ID: 0, payload size: 250
+
+Opcode: 2, Version: 4, ID: 0, payload size: 250
+
+Opcode: 1, Version: 4, ID: 0, payload size: 250
+
+Opcode: 2, Version: 4, ID: 0, payload size: 250
