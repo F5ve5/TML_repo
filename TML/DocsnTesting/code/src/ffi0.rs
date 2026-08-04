@@ -34,23 +34,28 @@ pub fn trace_loop(consumer_handle: PROCESSTRACE_HANDLE) {
 extern "system" fn gimme_eventdata(_event_data: *mut EVENT_RECORD){
 
     unsafe{
-    println!(
-    "Opcode: {}, Version: {}, ID: {}, payload size: {}",
-    (*_event_data).EventHeader.EventDescriptor.Opcode,
-    (*_event_data).EventHeader.EventDescriptor.Version,
-    (*_event_data).EventHeader.EventDescriptor.Id,
-    (*_event_data).UserDataLength
-    );
 
     let mut ed_buffer_size: u32 = 0;
 
-    let status = TdhGetEventInformation(_event_data, None, None, &mut ed_buffer_size);
+    let status0 = TdhGetEventInformation(_event_data, None, None, &mut ed_buffer_size);
 
-    let mut ed_buffer = vec![0u8, ed_buffer_size as u8];
+    let mut ed_buffer = vec![0u8; ed_buffer_size as usize];
     let ed = ed_buffer.as_mut_ptr() as *mut TRACE_EVENT_INFO;
 
-    let status = TdhGetEventInformation(_event_data, None, Some(ed), &mut ed_buffer_size);
+    let status1 = TdhGetEventInformation(_event_data, None, Some(ed), &mut ed_buffer_size);
+
+    println!("{:?}", status0);
+    println!("{:?}", status1);
+
+    let props = std::slice::from_raw_parts(
+        (*ed).EventPropertyInfoArray.as_ptr(),
+        (*ed).TopLevelPropertyCount as usize,
+    );
+
+    for prop in props {
+        println!("{:?}", prop.NameOffset);
+    }
+    }
 
     
-    }
 }
