@@ -1,5 +1,6 @@
-use std::ptr::null;
+use crate::misc;
 
+use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS};
 use windows::Win32::System::Diagnostics::Etw::*;
 use windows::core::PWSTR;
 
@@ -31,31 +32,79 @@ pub fn trace_loop(consumer_handle: PROCESSTRACE_HANDLE) {
     }
 }
 
-extern "system" fn gimme_eventdata(_event_data: *mut EVENT_RECORD){
-
+extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
     unsafe{
 
-    let mut ed_buffer_size: u32 = 0;
+    let mut tei_buf_size: u32 = 0;
 
-    let status0 = TdhGetEventInformation(_event_data, None, None, &mut ed_buffer_size);
+    let status0 = TdhGetEventInformation(
+        er, 
+        None, 
+        None, 
+        &mut tei_buf_size
+    );
+    if(status0 != ERROR_INSUFFICIENT_BUFFER.0){
+        println!("First TdhGetEventInformation failed: {:?}", status0);
+        return;
+    }
 
-    let mut ed_buffer = vec![0u8; ed_buffer_size as usize];
-    let ed = ed_buffer.as_mut_ptr() as *mut TRACE_EVENT_INFO;
+    let mut tei_buf = vec![0u8; tei_buf_size as usize];
+    let tei = tei_buf.as_mut_ptr() as *mut TRACE_EVENT_INFO;
+    let tei_ptr: *mut u8 = tei as *mut u8;
 
-    let status1 = TdhGetEventInformation(_event_data, None, Some(ed), &mut ed_buffer_size);
+    let status1 = TdhGetEventInformation(
+        er, 
+        None, 
+        Some(tei), 
+        &mut tei_buf_size
+    );
+    if(status1 != ERROR_SUCCESS.0){
+        println!("Second TdhGetEventInformation failed: {:?}", status1);
+        return;
+    }
 
-    println!("{:?}", status0);
-    println!("{:?}", status1);
-
-    let props = std::slice::from_raw_parts(
-        (*ed).EventPropertyInfoArray.as_ptr(),
-        (*ed).TopLevelPropertyCount as usize,
+    let props_tei = std::slice::from_raw_parts(
+        (*tei).EventPropertyInfoArray.as_ptr(),
+        (*tei).PropertyCount as usize,
     );
 
-    for prop in props {
-        println!("{:?}", prop.NameOffset);
-    }
-    }
+    for (i, prop_tei) in props_tei.iter().enumerate() {
+        let prop_name_ptr = (tei as *const u8).add(prop_tei.NameOffset as usize);
 
-    
+        let prop_desc = PROPERTY_DATA_DESCRIPTOR {
+            PropertyName: prop_name_ptr as u64,
+            ArrayIndex: u32::MAX,
+            Reserved: 0,
+        };
+
+        let mut prop_buf_size = 0;
+
+        let status2 = TdhGetPropertySize(
+            er, 
+            None, 
+            &[prop_desc], 
+            &mut prop_buf_size
+        );
+        if status2 != ERROR_SUCCESS.0 {
+            println!("TdhGetPropertySize failed: {:?}", status2);
+            return;
+        }
+
+        let mut prop_buf = vec![0u8; prop_buf_size as usize];
+
+        // 3d. Second call: decode property
+        let status3 = TdhGetProperty(
+            er,
+            None,
+            &[prop_desc],
+            &mut prop_buf,
+        );
+        if status3 != ERROR_SUCCESS.0 {
+            println!("TdhGetProperty failed: {:?}", status3);
+            return;
+        }
+
+        println!("Property {}: {:?}", i, misc::decode_nonstruct(prop_tei, &prop_buf));
+    }
+    }
 }

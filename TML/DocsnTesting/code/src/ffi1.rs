@@ -62,5 +62,5 @@ pub fn enable_provider(session_handle: CONTROLTRACE_HANDLE){
             println!("3:");
             println!("Message from enableprovider: {:?}", etx_msg);
             println!();
-    }   
+    }
 }

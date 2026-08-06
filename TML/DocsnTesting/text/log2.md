@@ -1144,3 +1144,282 @@ octopus" and "octopus on ship with glowing moon" which narrows it down a lot fur
 
 More specifically, because both of them are appplied together, the matchallkeyword is applied first and then additionally the matchanykeyword to expand afterwards.
 
+260719 UIBEGNG
+
+Been reading a litle about ETW and something that stood out to me was that you pass a buffer to StartTraceW not just because it allows windows to start a session faster and more efficiently but
+to keep a call to ETW as grounded and simple as possible thanks to how fundemental of a feature it is.
+
+Now to start designing the dekstop application. I've heard of something called "Tauri" and how it's compatible with Rust, but the thing isn't that it replaces JavaScript/HTML/CSS so what does it
+do? Well it's kind of like a bridge between the front-end and the back-end and then some as I understand it right now. Then there also happens to be something called "egui" (easy graphical user
+interface) which matches my mental picture of a front-end much better, instead of using the earlier mentioned other languages, egui stays native to Rust while still letting you design buttons,
+graphics and such and according to the geept it's pretty much meant for the type of program I want to make. I don't have any experience in JavaScript/HTML/CSS so I think imma go with the latter.
+
+--
+
+So egui
+
+Taking it all from a very nutshelled perspective, egui is not a complete GUI framework in that it doesn't do things like create the window to draw inside of, receieve input, present pixels on the
+screen etc. basically all of the OS-specifc things is handled by a an addon to egui called eframe. But after the setup is done, the mathematics for drawing are universal and therefore it can work 
+the same on every platform.
+
+-
+
+How do I add it? Cargo.toml
+
+More speficially, I added the latest version of both eframe and egui, namely 0.35.0 of both since they're made for eachother.
+
+-
+
+As I said before, eframe handles the "OS-specific" low-level stuff. Like if I didn't use eframe I'd probably have to continue handling low-level interactions like before with ETW. I guess I could
+do the ui part a little more manually than this butI don't think it'll be as necessary because it's not really about missing out on parts of the data that my program revolves around anymore,
+besides I don't want to be drawing triangles for the next 2 months.
+
+--
+
+So to put simply what eframe and egui does, eframe starts by creating a window inside of windows (the os) and it keeps it alive in use of a while loop. Inside of the while loop is where egui acts 
+to determine what is drawn onto the screen in use of logic from both input, the backend etc.
+
+For how the logic in egui/eframe works; it mainly revolves around a struct, of course it does. However there is a difference between the design philosophy of js/css/html and egui/eframe, mainly 
+that the former is a retained mode GUI and the latter an immediate mode GUI; to elaborate on this, a retained mode gui generally relies on storing gui assets the same way as any other logic while
+immediate mode gui means to only store in memory what is currently being shown on screen, meaning that you could think of it as basically being renewed every frame because "gui is just an
+immediate cause of the underlying flow of logic" or even "gui is a picture of the programs' current state".
+
+260720
+
+Times flies
+
+So there's a struct and there's and update function
+
+And  "revolves around a struct" in that all of the back-end data it relies on is delivered through a singular struct which it runs ui functions on every frame in order to display them in the
+desired way. Similarily, mouse position, click position and keyboard input is detected automatically in the loop so that you can run something like:
+
+"
+if(struct.data.asbutton().hoveringover()){
+    struct.data.asbutton().playoveranim();
+}
+"
+
+Where asbutton(), hoveringover() and possibly even playovernim() (I'm unsure but probably something similar at least) are handled by egui
+
+On the other hand, eframe handles what has to happen inside of the system up until this point, such as OS-specific means for receiving input, starting a window etc. you get it.
+
+-
+
+I think I've explained the general picture enough times now, so to get to the code. The struct that you create which contains the backend data I've basically explained the principle of already,
+but for the block of code that comes inside of the structs scope:
+
+"
+impl eframe::App for MyApp {
+
+}
+"
+
+where MyApp is the struct obviously
+
+And eframe::App I guess is sort of an implementation to the existing struct, this "implementation" is called a trait and it's called a trait because of the fact that it tells the compiler to
+treat the thing that it refers to in a specific way, in this case it says to implement the struct behavior of App from eframe to my own struct and for that implementation to work, it has its'
+own scope in which is brings over the function necessary for that new behavior to be implemented and that new function is;
+
+"
+fn update(
+    &mut self,
+    ctx: &egui::Context,
+    frame: &mut eframe::Frame,
+) {
+
+}
+"
+
+260721
+
+Trying to understand impl and traits currently
+
+-
+                                                                                        TRAITSEXPLLL
+So an impl and a trait are two different things. An impl works like:
+
+"
+struct sheep {name: &'static str, got_wool: bool}
+
+impl Sheep{
+    fn speak(&self){
+        ("BAAHHHHH!")
+    };
+
+    fn get_wool(&mut self){
+        if(self.got_wool){
+            println!("Okay I gotchu! Just take it and leave me alone!");
+            self.got_wool = true;
+        }else{
+            println!("Yo I swear I ain't got it on me!");
+        }
+    }
+}
+"
+
+just adding whatever functions onto an existing struct while the function needs the &self parameter because yada-yada the compiler doesn't know that the implementation is for the sheep type
+yet and only functions can be added, not variables. Traits work together with impl:
+
+"
+trait MakeSelfConcious{
+    fn say_name(&self);
+}
+
+impl MakeSelfConcious for Sheep{
+    fn say_name(&self){
+        println!("What's up G, my name's {}", self.name);
+    }
+}
+"
+So a trait is basically a specific impl which makes it so that a struct satisifes the needs for a certain behavior, in the case I'm at right now the need is the update function and the
+behavior is being sent off to egui/eframe. Why I can't just initially define update when creating the struct is a little unclear but I know that "impl eframe::App for MyApp" gives MyApp a
+certain symbol which makes it possible for it to be passed to eframe afterwards, a symbol which doesn't appear if I just define MyApp with the correct function declarations from the start.
+
+Actually my bad, in Rust it is impossible to define functions when initially creating a struct, that does make it make more sense.
+
+Also, I believe that the reason for implementing a trait to one of my existing structs rather than sending off a complete struct/buffer like with ETW is to lend more control into my own hands
+regarding how my own data is supposed to behave inside of the update loop which takes place inside of the struct that I instead own.
+
+-
+
+For the "sending off to eframe", it does work similarily to my earlier interactions with etw. I send over the struct along with a few other parameters as arguments through a function so that
+the main thing can interact with them. Running the linked function looks like this:
+
+"
+    let options = eframe::NativeOptions::default();
+
+    eframe::run_native(
+        "ETW Viewer",
+        options,
+        Box::new(|_cc| {
+            Ok(Box::new(MyApp {}))
+        })
+    ).unwrap();
+"
+
+There's a few things to.. unwrap here haha. The first line is creating a defaulted NativeOptions struct which means to just go with the default options regarding the App, then I pass:
+
+"ETW Viewer" - which is gonna be the name of the app in egui
+
+options - which is the defaulted struct I just explained
+
+Box::new(|_cc| {Ok(Box::new(MyApp {}))}) - so I'm creating an instance of the struct that I created and boxing it on the heap (which is a concept I've explored some time earlier)
+
+What do |_cc|, Ok() and unwrap() mean? One thing at a time:
+
+First for the Ok(), Rust has something called Result<T, E> which basically works as a return type for a function
+
+260722
+                                                            OKNERREXPL
+So the Result<T, E> type.
+
+The idea is that instead of returning a certain value of the return type of the function in order to signal that it failed its' operation, it returns a specific type in itself which here is
+"Error". The interesting thing is that both the successful return type and the failed one are both of their own distinct "type" and that type can be "unwrapped" in order to show only the
+value that was initially returned.
+
+The two different types Ok() and Err() (type T and type E/Error) are called "enums" and the basic premise of them is to basically serve as a "tag" or "label" on existing values in order to signal their role.
+
+So for example:
+
+"
+fn divide(a: f64, b: f64) -> Result<f64, &'static str> {
+    if b == 0.0 {
+        Err("cannot divide by zero")
+    } else {
+        Ok(a / b)
+    }
+}
+
+match divide(6.0, 2.0) {
+    Ok(value) => println!("Answer: {}", value),
+    Err(message) => println!("Error: {}", message),
+}
+"
+
+Here, the match operation is used to handle the two possible return types of the function. Where a Ok() return would signal a successful operation on the functions' behalf and Err() a failed one.
+
+--
+
+That concept covered, it seems fitting to explain the concept behind "unwrap()" next
+
+Because the function that I am sending my arguments to will return type Result<T, E>, unwrap() is one of the choices I can go with to distinguish the T variant from the E variant. What unwrap() does is basically
+crash the program and send an error message on what went wrong if an E type is returned
+
+I could also go with match instead of .unwrap() but the latter seems like the better option since it sends an automatic message on where in the code an error took place.
+
+--
+
+Now for the |_cc|
+
+"
+fn main() {
+    let y = 10;
+
+    let add = |x| x + y;
+
+    println!("{}", add(5)); // 15
+}
+"
+
+Here, the definition for |x| is x + y where the argument x is added onto the earlier defined y. This is different from |_cc| where the argument isn't used but the main point is that the point of a closure is to
+complete the action of what's explained infront of it, in my case it's: 
+
+"
+Ok(Box::new(MyApp {})) 
+"
+
+The Ok is there just because the egui expects the close itself to return a Result<T, E> when ran. The next confusing part is what's left;
+
+"
+Box::new(MyApp {})
+"
+
+Like it'd make more sense if what was left was just creating an instance of the struct upon running the closure, but instead you box it(?)
+
+-
+
+Actually that does make sense since eframe will box it
+
+And I forgot to mention that the closure itself is also boxed, which sort of makes sense I guess
+
+I'd like to look at the declaration for this function to understand its' last parameter better
+
+"
+pub fn run_native(
+    app_name: &str,
+    native_options: NativeOptions,
+    app_creator: Box<
+        dyn FnOnce(
+            &CreationContext
+        ) -> Result<
+            Box<dyn App>,
+            Box<dyn Error + Send + Sync>
+        >
+    >
+) -> Result<(), Error>
+"
+
+so
+
+"
+    app_creator: Box< 
+        dyn FnOnce(
+            &CreationContext
+        ) -> Result<
+            Box<dyn App>,
+            Box<dyn Error + Send + Sync>
+        >
+"
+
+Here I can see that the parameter requires a box which contains a function that can be ran once with the parameter of &CreationCotext which is equivalent to the |_cc| and that function is required to return another box
+which itself contains a struct with the App trait implemented, either that or an error. Now why the closure satisfies the FnOnce trait is weird but it has something to do with the fact that each closure is able to satisfy
+one or more of three different function traits.
+
+I hope I'll come to grasp this better later, the double boxing and all.
+
+---
+
+The natural next step is to establish communication between the received events and the ui
+
+260730
+
