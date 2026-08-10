@@ -1,15 +1,17 @@
 mod ffi0;
 mod ffi1;
 mod misc;
-mod events;
+mod pref;
+mod biner;
+mod files;
 
 use std::sync::OnceLock;
 
 pub fn main() {
 
-    let (tx, rx) = std::sync::mpsc::channel::<events::pr_event>();
+    //let (tx, rx) = std::sync::mpsc::channel::<events::pr_event>();
 
-    static TX: OnceLock<std::sync::mpsc::Sender<events::pr_event>> = OnceLock::new();
+    //static TX: OnceLock<std::sync::mpsc::Sender<events::pr_event>> = OnceLock::new();
 
     std::thread::spawn(move || {
     
@@ -19,11 +21,18 @@ pub fn main() {
     let session_name_r: &str = "NT Kernel Logger";
     let session_name_c: Vec<u16> = misc::r_to_utf16_string(session_name_r);
 
-    let session_handle = ffi1::start_session(&session_name_c);
+    let _session_handle = ffi1::start_session(&session_name_c);
     let consumer_handle = ffi0::open_trace(&session_name_c);
-    println!("2:");
-    println!("Consumer handle from opentrace: {:?}", consumer_handle);
+    println!("2. OpenTraceW");
+    println!("Handle: {:?}", consumer_handle);
     println!();
+
+    let be_res = files::bin_establish();
+    match be_res{
+        Ok(()) => (),
+        Err(e) => println!("be: {:?}", e)
+    };
+
     ffi0::trace_loop(consumer_handle);
-    ffi1::enable_provider(session_handle);
+    //ffi1::enable_provider(_session_handle);
 }

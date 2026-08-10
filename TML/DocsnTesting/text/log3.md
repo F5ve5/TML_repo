@@ -167,3 +167,13 @@ Opcode: 2, Version: 4, ID: 0, payload size: 250
 Opcode: 1, Version: 4, ID: 0, payload size: 250
 
 Opcode: 2, Version: 4, ID: 0, payload size: 250
+
+//////////////////////////
+
+    println!(
+    "Opcode: {}, Version: {}, ID: {}, payload size: {}",
+    (*_event_data).EventHeader.EventDescriptor.Opcode,
+    (*_event_data).EventHeader.EventDescriptor.Version,
+    (*_event_data).EventHeader.EventDescriptor.Id,
+    (*_event_data).UserDataLength
+    );

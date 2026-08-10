@@ -33,13 +33,9 @@ pub fn start_session(session_name: &[u16]) -> CONTROLTRACE_HANDLE {
 
     let stw_msg = StartTraceW( &mut session_handle, PCWSTR(session_name.as_ptr()), props);
    
-    print!("1:");
-    println!("Message from starttrace: {:?}", stw_msg );
-    println!("Session handle from starttrace: {:?}", session_handle);
-    println!("Guid: {:?}", (*props).Wnode.Guid);
-    println!("Flags: {:?}", (*props).Wnode.Flags);
-    println!("Mode: {:?}", (*props).LogFileMode);
-    println!("Enable: {:?}", (*props).EnableFlags);
+    println!("1. StartTraceW");
+    println!("Status: {:?}", stw_msg );
+    println!("Handle: {:?}", session_handle);
     println!();
     }
 
