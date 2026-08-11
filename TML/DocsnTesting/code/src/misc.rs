@@ -28,6 +28,11 @@ pub enum PropertyValue {
     Bytes(Vec<u8>),
 }
 
+pub struct UPRet{
+    index: u8,
+    property: PropertyValue
+}
+
 #[derive(Debug)]
 pub enum PropertyType {
     U8,
