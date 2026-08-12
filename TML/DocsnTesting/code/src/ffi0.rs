@@ -4,7 +4,6 @@ use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS};
 use windows::Win32::System::Diagnostics::Etw::*;
 use windows::core::PWSTR;
 use windows::core::GUID;
-use misc::PropertyValue;
 
 pub fn open_trace(session_name: &[u16]) -> PROCESSTRACE_HANDLE {
     
@@ -64,7 +63,7 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
         return;
     }
 
-    biner::bin_header(&(*er).EventHeader);
+    biner::bin_event_header(&(*er).EventHeader);
 
     let props_tei = std::slice::from_raw_parts(
         (*tei).EventPropertyInfoArray.as_ptr(),
@@ -109,7 +108,7 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
         }
 
         //println!("Property #{} {} Decoded: {:?}", i, utf16_to_r_string(prop_name_ptr as *const u16), decode_property(&prop_buf, prop_tei.Anonymous1.nonStructType.InType));
-        biner::bin_property(i as u8, prop_tei.Flags.0, prop_tei.Anonymous1, &prop_buf);
+        biner::bin_event_property(i as u8, prop_tei.Flags.0, prop_tei.Anonymous1, &prop_buf);
         }else{
         //println!("Property #{} {} Not Wanted", i, utf16_to_r_string(prop_name_ptr as *const u16));
         };
