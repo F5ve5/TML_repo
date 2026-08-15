@@ -4,6 +4,7 @@ mod misc;
 mod pref;
 mod biner;
 mod files;
+mod aislop;
 
 use std::sync::OnceLock;
 
