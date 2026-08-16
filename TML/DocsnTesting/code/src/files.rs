@@ -1,76 +1,67 @@
-use std::{fs::{File, OpenOptions}, io::{Error, Read, Result, Seek, SeekFrom, Write}, sync::{Mutex, OnceLock}};
+use std::{fs::{File, OpenOptions},io::{Error, ErrorKind, Read, Result, Seek, SeekFrom, Write},sync::{Mutex, OnceLock}};
 
-static BIN_FILE: OnceLock<Mutex<File>> = OnceLock::new();
-static BIN_FILE_BOOKMARK: OnceLock<Mutex<u64>> = OnceLock::new();
+struct Bin {
+    file: File,
+    bookmark: u64,
+}
+
+static BIN: OnceLock<Mutex<Bin>> = OnceLock::new();
 
 pub fn bin_establish() -> Result<()> {
-
     let filename = chrono::Local::now()
         .format("TML_%Y-%m-%d_%H-%M-%S.bin")
         .to_string();
 
-    let bf_set = BIN_FILE.set(
-        Mutex::new(OpenOptions::new()
-            .write(true)
-            .read(true)
-            .create_new(true)
-            .open(&filename)?
-    ));
-    match bf_set{
-        Ok(_) => {},
-        Err(_) => return Err(Error::new(std::io::ErrorKind::AlreadyExists, "bin file already established")) 
-    };
+    let file = OpenOptions::new()
+        .write(true)
+        .read(true)
+        .create_new(true)
+        .open(&filename)?;
 
-    BIN_FILE_BOOKMARK.set(Mutex::new(0)).unwrap();
+    BIN.set(Mutex::new(Bin {
+        file: file,
+        bookmark: 0,
+    }))
+        .map_err(|_| {
+            Error::new(
+            ErrorKind::AlreadyExists,
+            "bin file already established",
+            )
+    })?;
 
-    return Ok(());
+    Ok(())
 }
 
-pub fn bin_write(byte_slice: &[u8]) -> Result<()>{
-
-    BIN_FILE
-        .get()
-        .unwrap()
-        .lock()
-        .unwrap()
-        .write_all(byte_slice)?;
-
-    return Ok(());
-}
-
-pub fn bin_read_unread() -> Result<Vec<u8>> {
-
-    let mut bin_vec: Vec<u8> = Vec::new();
-
-    let mut bf = BIN_FILE
+#[inline]
+pub fn bin_write(byte_slice: &[u8]) -> Result<()> {
+    let mut bin = BIN
         .get()
         .unwrap()
         .lock()
         .unwrap();
 
-    bf
-        .seek(SeekFrom::Start(
-        *(BIN_FILE_BOOKMARK
-            .get()
-            .unwrap()
-            .lock()
-            .unwrap())))?;
+    bin.file.write_all(byte_slice)?;
 
-    bf
-        .read_to_end(&mut bin_vec)?;
+    Ok(())
+}
 
-    //update bookmark, beautiful
-    *(BIN_FILE_BOOKMARK
+#[inline]
+pub fn bin_read_unread() -> Result<Vec<u8>> {
+    let mut bin_vec: Vec<u8> = Vec::new();
+
+    let mut bin = BIN
         .get()
         .unwrap()
         .lock()
-        .unwrap()) = 
-    BIN_FILE
-        .get()
-        .unwrap()
-        .lock()
-        .unwrap()
-        .stream_position()?;
+        .unwrap();
 
-    return Ok(bin_vec);
+    let bm = bin.bookmark;
+
+    bin.file.seek(SeekFrom::Start(bm))?;
+
+    bin.file.read_to_end(&mut bin_vec)?;
+
+    bin.bookmark = bin.file.stream_position()?;
+
+    Ok(bin_vec)
 }

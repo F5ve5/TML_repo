@@ -1,10 +1,10 @@
-use crate::{aislop, files::{bin_read_unread, bin_write}, misc, pref::{WANTED_EVENT_HEADER_INFO, WANTED_PROPS}};
+use crate::{cypher, files::{bin_read_unread, bin_write}, misc, pref::{WANTED_EVENT_HEADER_INFO, WANTED_PROPS}};
 
 use windows::Win32::System::Diagnostics::Etw::*;
-use core::slice;
 use std::mem::size_of_val;
 
-pub fn  unbin_events() -> EVRet{
+#[inline]
+pub fn unbin_events() -> EVRet{
 
     let bin_vec = match bin_read_unread() {
         Ok(v) => v,
@@ -29,9 +29,8 @@ pub fn  unbin_events() -> EVRet{
     let mut header_value_size: u32;
     let mut header_value: &[u8];
 
-    let mut property_value_index: u8;
-    let mut property_value_flags: u32;
-    let mut property_value_type_union: &[u8];
+    let mut property_name_index: u8;
+    let mut property_value_type: u8;
     let mut property_valuebuffer_size: u32;
     let mut property_value_buffer: &[u8];
 
@@ -52,28 +51,25 @@ pub fn  unbin_events() -> EVRet{
 
         ehf_vec.push(EventHeaderFinal{
             index: header_value_index,
-            value: misc::EnumTW::Bytes(header_value.to_vec())
+            value: header_value.to_vec()
         });
     }
     while property_value_amount >= 1{
         property_value_amount-= 1;
 
-        property_value_index = bin_vec[currentbyte];
+        property_name_index = bin_vec[currentbyte];
             currentbyte += 1;
-        property_value_flags = u32::from_le_bytes([bin_vec[currentbyte], bin_vec[currentbyte + 1], bin_vec[currentbyte + 2], bin_vec[currentbyte + 3]]);
-            currentbyte += 4;
-        property_value_type_union = &bin_vec[currentbyte..currentbyte + 8];
-            currentbyte += 8;
+        property_value_type = bin_vec[currentbyte];
+            currentbyte += 1;
         property_valuebuffer_size = u32::from_le_bytes([bin_vec[currentbyte], bin_vec[currentbyte + 1], bin_vec[currentbyte + 2], bin_vec[currentbyte + 3]]);
             currentbyte += 4;
         property_value_buffer = &bin_vec[currentbyte..(currentbyte + property_valuebuffer_size as usize)];
             currentbyte += property_valuebuffer_size as usize;
 
-        let property_value = aislop::decode_serialized_property(&property_value_type_union, &property_value_flags, &property_value_buffer);
-
         epf_vec.push(EventPropertyFinal{
-            index: property_value_index,
-            value: property_value
+            name_index: property_name_index,
+            type_index: property_value_type,
+            value: property_value_buffer.to_vec()
         });
     }
 
@@ -82,32 +78,31 @@ pub fn  unbin_events() -> EVRet{
         properties: epf_vec
     };
 }
-
-struct EventHeaderFinal{
+#[derive(Debug)]
+pub struct EventHeaderFinal{
     index: u8,
-    value: misc::EnumTW
+    value: Vec<u8>
 }
-struct EventPropertyFinal{
-    index: u8,
-    value: aislop::DecodedValue,
+#[derive(Debug)]
+pub struct EventPropertyFinal{
+    name_index: u8,
+    type_index: u8,
+    value: Vec<u8>
 }
-struct EVRet{
+#[derive(Debug)]
+pub struct EVRet{
     headers: Vec<EventHeaderFinal>,
     properties: Vec<EventPropertyFinal>
 }
 
-pub fn bin_event_property(index: u8, epi_flags: i32, epi_type: EVENT_PROPERTY_INFO_0, property_buffer_b: &[u8]){
+#[inline]
+pub fn bin_event_property(name_index_b: u8, type_index_b: u8, property_buffer_b: &[u8]){
 
     let mut bin_vec: Vec<u8> = Vec::new();
-
-    let flags_b = epi_flags.to_le_bytes(); //i32
-    let type_union_b = unsafe{slice::from_raw_parts(&epi_type as *const EVENT_PROPERTY_INFO_0 as *const u8, 8)
-    }; //u16 + u16 + u32; union
     let p_buf_size_b = (property_buffer_b.len() as u32).to_le_bytes();
     
-    bin_vec.push(index);
-    bin_vec.extend_from_slice(&flags_b);
-    bin_vec.extend_from_slice(&type_union_b);
+    bin_vec.push(name_index_b);
+    bin_vec.push(type_index_b);
     bin_vec.extend_from_slice(&p_buf_size_b);
     bin_vec.extend_from_slice(property_buffer_b);
 
@@ -118,6 +113,7 @@ pub fn bin_event_property(index: u8, epi_flags: i32, epi_type: EVENT_PROPERTY_IN
     };
 }
 
+#[inline]
 pub fn bin_event_header(event_header: &EVENT_HEADER){
     
 let mut bin_vec: Vec<u8> = Vec::new();
@@ -125,8 +121,8 @@ let mut bin_vec: Vec<u8> = Vec::new();
 let header_value_amount_b = WANTED_EVENT_HEADER_INFO.iter().filter(|&&x| x).count();
 let property_value_amount_b = WANTED_PROPS.iter().filter(|&&x| x).count();
 
-bin_vec.push(header_value_amount_b as u8 + 1);
-bin_vec.push(property_value_amount_b as u8 + 1);
+bin_vec.push(header_value_amount_b as u8);
+bin_vec.push(property_value_amount_b as u8);
     
 if WANTED_EVENT_HEADER_INFO[0]{
     let data_b = event_header.Size.to_le_bytes();

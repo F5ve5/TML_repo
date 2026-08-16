@@ -1,9 +1,8 @@
-use crate::{biner, misc, pref};
+use crate::{biner, pref, cypher};
 
 use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS};
 use windows::Win32::System::Diagnostics::Etw::*;
 use windows::core::PWSTR;
-use windows::core::GUID;
 
 pub fn open_trace(session_name: &[u16]) -> PROCESSTRACE_HANDLE {
     
@@ -33,6 +32,7 @@ pub fn trace_loop(consumer_handle: PROCESSTRACE_HANDLE) {
     }
 }
 
+#[inline]
 extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
     unsafe{
 
@@ -71,7 +71,7 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
     );
     for (i, prop_tei) in props_tei.iter().enumerate() {
         
-        let prop_name_ptr = (tei as *const u8).add(prop_tei.NameOffset as usize);
+        let prop_name_ptr = ((tei as *const u8).add(prop_tei.NameOffset as usize)) as *const u16;
 
         if(pref::WANTED_PROPS[i]){
 
@@ -107,11 +107,26 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
             return;
         }
 
+        let type_union_raw: &[u8] = unsafe {
+        std::slice::from_raw_parts(
+        &prop_tei.Anonymous1 as *const _ as *const u8,
+        8,
+        )
+        };
+
+        let pni = cypher::get_property_name_index(prop_name_ptr) as u8;
+        let pti = cypher::get_property_type_index( type_union_raw, prop_tei.Flags.0 as u32);
+
+        if pref::WANTED_PROPS[pni as usize]{
+            biner::bin_event_property(pni, pti, &prop_buf);
+        }
+
         //println!("Property #{} {} Decoded: {:?}", i, utf16_to_r_string(prop_name_ptr as *const u16), decode_property(&prop_buf, prop_tei.Anonymous1.nonStructType.InType));
-        biner::bin_event_property(i as u8, prop_tei.Flags.0, prop_tei.Anonymous1, &prop_buf);
         }else{
         //println!("Property #{} {} Not Wanted", i, utf16_to_r_string(prop_name_ptr as *const u16));
         };
     }
     }
+
+    println!("{:?}",biner::unbin_events());
 }
