@@ -23,7 +23,7 @@ pub fn unbin_events() -> EVRet{
     let mut currentbyte: usize = 0;
 
     let mut header_value_amount: u8;
-    let mut property_value_amount: u8;
+    let mut last_property_thatis_wanted: bool = false;
 
     let mut header_value_index: u8;
     let mut header_value_size: u32;
@@ -36,8 +36,7 @@ pub fn unbin_events() -> EVRet{
 
     header_value_amount = bin_vec[currentbyte];
         currentbyte += 1;
-    property_value_amount = bin_vec[currentbyte];
-        currentbyte += 1;
+
 
     while header_value_amount >= 1{
         header_value_amount -= 1;
@@ -54,11 +53,18 @@ pub fn unbin_events() -> EVRet{
             value: header_value.to_vec()
         });
     }
-    while property_value_amount >= 1{
-        property_value_amount-= 1;
-
+    while !last_property_thatis_wanted{
         property_name_index = bin_vec[currentbyte];
             currentbyte += 1;
+        if property_name_index >= 50{
+            if property_name_index == 50{
+                break;
+            }else{
+                property_name_index = 100 - property_name_index;
+                last_property_thatis_wanted = true;
+            }
+        }
+
         property_value_type = bin_vec[currentbyte];
             currentbyte += 1;
         property_valuebuffer_size = u32::from_le_bytes([bin_vec[currentbyte], bin_vec[currentbyte + 1], bin_vec[currentbyte + 2], bin_vec[currentbyte + 3]]);
@@ -119,10 +125,8 @@ pub fn bin_event_header(event_header: &EVENT_HEADER){
 let mut bin_vec: Vec<u8> = Vec::new();
 
 let header_value_amount_b = WANTED_EVENT_HEADER_INFO.iter().filter(|&&x| x).count();
-let property_value_amount_b = WANTED_PROPS.iter().filter(|&&x| x).count();
 
 bin_vec.push(header_value_amount_b as u8);
-bin_vec.push(property_value_amount_b as u8);
     
 if WANTED_EVENT_HEADER_INFO[0]{
     let data_b = event_header.Size.to_le_bytes();
@@ -273,7 +277,7 @@ if WANTED_EVENT_HEADER_INFO[16]{
     unsafe{
     if (event_header.Flags as u32) & EVENT_HEADER_FLAG_PRIVATE_SESSION != 0{
         let data_b = event_header.Anonymous.ProcessorTime.to_le_bytes();
-        let data_size = size_of_val(&event_header.Anonymous.ProcessorTime.to_le_bytes()) as u16;
+        let data_size = size_of_val(&event_header.Anonymous.ProcessorTime.to_le_bytes()) as u32;
         let data_size_b = data_size.to_le_bytes();
 
         bin_vec.extend_from_slice(&data_size_b);
@@ -284,7 +288,7 @@ if WANTED_EVENT_HEADER_INFO[16]{
         let data_b1 = event_header.Anonymous.Anonymous.UserTime.to_le_bytes();
 
         let data_size  = (size_of_val(&event_header.Anonymous.Anonymous.KernelTime.to_le_bytes()) +
-        size_of_val(&event_header.Anonymous.Anonymous.UserTime.to_le_bytes())) as u16;
+        size_of_val(&event_header.Anonymous.Anonymous.UserTime.to_le_bytes())) as u32;
         let data_size_b = data_size.to_le_bytes();
 
         bin_vec.extend_from_slice(&data_size_b);

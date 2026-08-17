@@ -11,7 +11,8 @@
 // 9 CommandLine String
 // 10 PackageFullName String
 // 11 ApplicationId String
-pub const WANTED_PROPS: [bool; 12] = [
+// 12 Unknown 0
+pub const WANTED_PROPS: [bool; 13] = [
     false,
     true,
     true,
@@ -22,6 +23,7 @@ pub const WANTED_PROPS: [bool; 12] = [
     false,
     true,
     true,
+    false,
     false,
     false
 ];

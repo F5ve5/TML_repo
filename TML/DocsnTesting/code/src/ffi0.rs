@@ -1,5 +1,6 @@
-use crate::{biner, pref, cypher};
+use crate::{biner, pref, cypher, misc};
 
+use std::ops::Sub;
 use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS};
 use windows::Win32::System::Diagnostics::Etw::*;
 use windows::core::PWSTR;
@@ -44,7 +45,7 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
         None, 
         &mut tei_buf_size
     );
-    if(status0 != ERROR_INSUFFICIENT_BUFFER.0){
+    if status0 != ERROR_INSUFFICIENT_BUFFER.0{
         println!("First TdhGetEventInformation failed: {:?}", status0);
         return;
     }
@@ -58,7 +59,7 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
         Some(tei), 
         &mut tei_buf_size
     );
-    if(status1 != ERROR_SUCCESS.0){
+    if status1 != ERROR_SUCCESS.0{
         println!("Second TdhGetEventInformation failed: {:?}", status1);
         return;
     }
@@ -73,57 +74,59 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
         
         let prop_name_ptr = ((tei as *const u8).add(prop_tei.NameOffset as usize)) as *const u16;
 
-        if(pref::WANTED_PROPS[i]){
+        if pref::WANTED_PROPS[(cypher::get_property_name_index(prop_name_ptr)) as usize]{
 
-        let prop_desc = PROPERTY_DATA_DESCRIPTOR {
-            PropertyName: prop_name_ptr as u64,
-            ArrayIndex: u32::MAX,
-            Reserved: 0,
-        };
+            let prop_desc = PROPERTY_DATA_DESCRIPTOR {
+                PropertyName: prop_name_ptr as u64,
+                ArrayIndex: u32::MAX,
+                Reserved: 0,
+            };
 
-        let mut prop_buf_size = 0;
+            let mut prop_buf_size = 0;
 
-        let status2 = TdhGetPropertySize(
-            er, 
-            None, 
-            &[prop_desc], 
-            &mut prop_buf_size
-        );
-        if status2 != ERROR_SUCCESS.0 {
-            println!("TdhGetPropertySize failed: {:?}", status2);
-            return;
-        }
+            let status2 = TdhGetPropertySize(
+                er, 
+                None, 
+                &[prop_desc], 
+                &mut prop_buf_size
+            );
+            if status2 != ERROR_SUCCESS.0 {
+                println!("TdhGetPropertySize failed: {:?}", status2);
+                return;
+            }
 
-        let mut prop_buf = vec![0u8; prop_buf_size as usize];
+            let mut prop_buf = vec![0u8; prop_buf_size as usize];
 
-        let status3 = TdhGetProperty(
-            er,
-            None,
-            &[prop_desc],
-            &mut prop_buf,
-        );
-        if status3 != ERROR_SUCCESS.0 {
-            println!("TdhGetProperty failed: {:?}", status3);
-            return;
-        }
+            let status3 = TdhGetProperty(
+                er,
+                None,
+                &[prop_desc],
+                &mut prop_buf,
+            );
+            if status3 != ERROR_SUCCESS.0 {
+                println!("TdhGetProperty failed: {:?}", status3);
+                return;
+            }
+            
+            let pni = cypher::get_property_name_index(prop_name_ptr) as u8;
 
-        let type_union_raw: &[u8] = unsafe {
-        std::slice::from_raw_parts(
-        &prop_tei.Anonymous1 as *const _ as *const u8,
-        8,
-        )
-        };
+            let type_union_raw: &[u8] = std::slice::from_raw_parts(&prop_tei.Anonymous1 as *const _ as *const u8, 8);
+            let pti = cypher::get_property_type_index( type_union_raw, prop_tei.Flags.0 as u32);
 
-        let pni = cypher::get_property_name_index(prop_name_ptr) as u8;
-        let pti = cypher::get_property_type_index( type_union_raw, prop_tei.Flags.0 as u32);
+            if i == props_tei.len().sub(1){
+                biner::bin_event_property(100.sub(pni), pti, &prop_buf);
+            }else{
+                biner::bin_event_property(pni, pti, &prop_buf);
+            }
 
-        if pref::WANTED_PROPS[pni as usize]{
-            biner::bin_event_property(pni, pti, &prop_buf);
-        }
-
-        //println!("Property #{} {} Decoded: {:?}", i, utf16_to_r_string(prop_name_ptr as *const u16), decode_property(&prop_buf, prop_tei.Anonymous1.nonStructType.InType));
+            //println!("Decoded property #{} {}", i, misc::utf16_to_r_string(prop_name_ptr as *const u16));
         }else{
-        //println!("Property #{} {} Not Wanted", i, utf16_to_r_string(prop_name_ptr as *const u16));
+
+            if i == props_tei.len().sub(1){
+                biner::bin_event_property(50, 50, &vec![0u8; 1]);
+            }
+
+            //println!("Unwanted property #{} {}", i, misc::utf16_to_r_string(prop_name_ptr as *const u16));
         };
     }
     }

@@ -2,25 +2,27 @@ use windows::Win32::System::Diagnostics::Etw::*;
 
 #[inline]
 pub fn get_property_name_index(name: *const u16) -> PropertyNameIndex {
-    let a = unsafe{*name};
+    let _a = unsafe{*name};
     let b = unsafe{*name.add(1)};
     let c = unsafe{*name.add(2)};
     //a points to the first u16 character, b 16 bits forward in memory etc.
     //accounts for as many characters as necessary to distinguish between the different possible property names
-    //important to optimize because this code is going to be ran most often of all
-    match (a, b, c) {
-        (85, 110, 105) => PropertyNameIndex::UniqueProcessKey,  // Uni
-        (80, 114, 111) => PropertyNameIndex::ProcessId,         // Pro
-        (80, 97, 114) => PropertyNameIndex::ParentId,           // Par
-        (83, 101, 115) => PropertyNameIndex::SessionId,         // Ses
-        (69, 120, 105) => PropertyNameIndex::ExitStatus,        // Exi
-        (68, 105, 114) => PropertyNameIndex::DirectoryTableBase,// Dir
-        (70, 108, 97) => PropertyNameIndex::Flags,              // Fla
-        (85, 115, 101) => PropertyNameIndex::UserSID,           // Use
-        (73, 109, 97) => PropertyNameIndex::ImageFileName,      // Ima
-        (67, 111, 109) => PropertyNameIndex::CommandLine,       // Com
-        (80, 97, 99) => PropertyNameIndex::PackageFullName,     // Pac
-        (65, 112, 112) => PropertyNameIndex::ApplicationId,     // App
+    //important to optimize because this code is going to be ran most often of all.
+    //
+    //The returned enum can be presented as a u8 which represents an index in pref::WANTED_EVENTS_PROPS
+    match (b, c) {
+        (110, 105) => PropertyNameIndex::UniqueProcessKey,  // Xni
+        (114, 111) => PropertyNameIndex::ProcessId,         // Xro
+        (97, 114) => PropertyNameIndex::ParentId,           // Xar
+        (101, 115) => PropertyNameIndex::SessionId,         // Xes
+        (120, 105) => PropertyNameIndex::ExitStatus,        // Xxi
+        (105, 114) => PropertyNameIndex::DirectoryTableBase,// Xir
+        (108, 97) => PropertyNameIndex::Flags,              // Xla
+        (115, 101) => PropertyNameIndex::UserSID,           // Xse
+        (109, 97) => PropertyNameIndex::ImageFileName,      // Xma
+        (111, 109) => PropertyNameIndex::CommandLine,       // Xom
+        (97, 99) => PropertyNameIndex::PackageFullName,     // Xac
+        (112, 112) => PropertyNameIndex::ApplicationId,     // Xpp
         _ => PropertyNameIndex::Unknown,
     }
 }
@@ -38,7 +40,7 @@ pub enum PropertyNameIndex {
     CommandLine = 9,
     PackageFullName = 10,
     ApplicationId = 11,
-    Unknown = 255,
+    Unknown = 12,
 }
 
 
@@ -62,11 +64,13 @@ pub enum PropertyNameIndex {
 // SystemTime = 15
 // Hex        = 16
 // Binary     = 17
+//Similarily to the function above, this function takes the necessary data to understand the type of the property it's
+//from and converts it into a u8 which represents an index in the enum cypher::PropertyValue, as also shown above.
+//Written mostly by AI btw, since I don't want to learn type the type philosophy of TDH myself
 pub fn get_property_type_index(
     union_bytes: &[u8],
     flags: u32,
 ) -> u8 {
-
     assert_eq!(union_bytes.len(), 8);
 
     // EVENT_PROPERTY_INFO.Flags
@@ -289,7 +293,8 @@ _ => PropertyValue::Null(0)
 }
 
 
-
+//The header values' index does not have to be evaluated as it is simply a variable in a struct rather than an array of mixed up properties
+//Atleast I think they're mixed up, never seen it with my own eyes but GPT says so, so idk
 #[derive(Debug)]
 pub enum HeaderValue {
     U8(u8),

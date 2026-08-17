@@ -6,15 +6,14 @@ mod biner;
 mod files;
 mod cypher;
 
-use std::sync::OnceLock;
+use std::{thread,sync::{OnceLock,mpsc}};
 
+static TX0: OnceLock<mpsc::Sender<biner::EVRet>> = OnceLock::new();
 pub fn main() {
 
-    //let (tx, rx) = std::sync::mpsc::channel::<events::pr_event>();
-
-    //static TX: OnceLock<std::sync::mpsc::Sender<events::pr_event>> = OnceLock::new();
-
-    std::thread::spawn(move || {
+    let (tx, rx) = std::sync::mpsc::channel::<biner::EVRet>();
+    TX0.set(tx).unwrap();
+    thread::spawn(move || {
     
     }
     );
