@@ -3,6 +3,7 @@ use std::{fs::{File, OpenOptions},io::{Error, ErrorKind, Read, Result, Seek, See
 struct Bin {
     file: File,
     bookmark: u64,
+    verified_len: u64
 }
 
 static BIN: OnceLock<Mutex<Bin>> = OnceLock::new();
@@ -21,6 +22,7 @@ pub fn bin_establish() -> Result<()> {
     BIN.set(Mutex::new(Bin {
         file: file,
         bookmark: 0,
+        verified_len: 0
     }))
         .map_err(|_| {
             Error::new(
@@ -42,6 +44,7 @@ pub fn bin_write(byte_slice: &[u8]) -> Result<()> {
 
     bin.file.write_all(byte_slice)?;
 
+    bin.verified_len = bin.file.seek(SeekFrom::End(0))?;
     Ok(())
 }
 
@@ -64,4 +67,16 @@ pub fn bin_read_unread() -> Result<Vec<u8>> {
     bin.bookmark = bin.file.stream_position()?;
 
     Ok(bin_vec)
+}
+
+fn bin_verify(){
+    let mut bin = BIN
+        .get()
+        .unwrap()
+        .lock()
+        .unwrap();
+
+    if !bin.verified_len == bin.file.seek(SeekFrom::End(0)).unwrap(){
+        todo!("Manual event bin verification logic not made yet!");
+    }
 }

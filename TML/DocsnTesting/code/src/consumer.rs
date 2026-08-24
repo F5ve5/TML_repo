@@ -1,4 +1,4 @@
-use crate::{biner, pref, cypher, misc};
+use crate::{biner, cypher, files, pref};
 
 use std::ops::Sub;
 use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS};
@@ -35,8 +35,11 @@ pub fn trace_loop(consumer_handle: PROCESSTRACE_HANDLE) {
 
 #[inline]
 extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
+    let mut bin_vec: Vec<u8> = Vec::new();
+    bin_vec.extend_from_slice(&[0u8; 5]);
     unsafe{
 
+    ////
     let mut tei_buf_size: u32 = 0;
 
     let status0 = TdhGetEventInformation(
@@ -63,19 +66,26 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
         println!("Second TdhGetEventInformation failed: {:?}", status1);
         return;
     }
+    //
 
-    biner::bin_event_header(&(*er).EventHeader);
+    bin_vec.extend_from_slice(&biner::bin_event_header(&(*er).EventHeader));
 
+    ////
     let props_tei = std::slice::from_raw_parts(
         (*tei).EventPropertyInfoArray.as_ptr(),
         (*tei).PropertyCount as usize,
     );
+    //
+    
     for (i, prop_tei) in props_tei.iter().enumerate() {
         
+        ////
         let prop_name_ptr = ((tei as *const u8).add(prop_tei.NameOffset as usize)) as *const u16;
-
+        //
+        
         if pref::WANTED_PROPS[(cypher::get_property_name_index(prop_name_ptr)) as usize]{
 
+            ////
             let prop_desc = PROPERTY_DATA_DESCRIPTOR {
                 PropertyName: prop_name_ptr as u64,
                 ArrayIndex: u32::MAX,
@@ -107,28 +117,28 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
                 println!("TdhGetProperty failed: {:?}", status3);
                 return;
             }
-            
+            //
+        
             let pni = cypher::get_property_name_index(prop_name_ptr) as u8;
 
             let type_union_raw: &[u8] = std::slice::from_raw_parts(&prop_tei.Anonymous1 as *const _ as *const u8, 8);
             let pti = cypher::get_property_type_index( type_union_raw, prop_tei.Flags.0 as u32);
 
-            if i == props_tei.len().sub(1){
-                biner::bin_event_property(100.sub(pni), pti, &prop_buf);
-            }else{
-                biner::bin_event_property(pni, pti, &prop_buf);
-            }
+            bin_vec.extend_from_slice(&biner::bin_event_property(pni, pti, &prop_buf));
 
-            //println!("Decoded property #{} {}", i, misc::utf16_to_r_string(prop_name_ptr as *const u16));
-        }else{
-
-            if i == props_tei.len().sub(1){
-                biner::bin_event_property(50, 50, &vec![0u8; 1]);
-            }
-
-            //println!("Unwanted property #{} {}", i, misc::utf16_to_r_string(prop_name_ptr as *const u16));
+            //println!("Decoded property #{} {}", i, misc::utf16_to_r_string(prop_name_ptr as *const 
         };
+
+        //println!("Unwanted property #{} {}", i, misc::utf16_to_r_string(prop_name_ptr as *const u16));
     }
+    }
+
+    bin_vec[0] = 255;
+    let bv_len_from_255 = bin_vec.len() as u32;
+    bin_vec[1..5].copy_from_slice(&bv_len_from_255.to_le_bytes());
+    match files::bin_write(&bin_vec){
+        Ok(()) => (),
+        Err(e) => println!("bin_write failed in gimme_eventdata: {:?}", e)
     }
 
     println!("{:?}",biner::unbin_events());

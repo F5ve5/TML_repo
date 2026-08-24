@@ -1,4 +1,5 @@
 use windows::Win32::System::Diagnostics::Etw::*;
+use windows::Win32::Foundation::ERROR_SUCCESS;
 use windows::core::PCWSTR;
 use std::mem::size_of;
 
@@ -31,18 +32,16 @@ pub fn start_session(session_name: &[u16]) -> CONTROLTRACE_HANDLE {
     session_name.len(),
     );
 
-    let stw_msg = StartTraceW( &mut session_handle, PCWSTR(session_name.as_ptr()), props);
-   
-    println!("1. StartTraceW");
-    println!("Status: {:?}", stw_msg );
-    println!("Handle: {:?}", session_handle);
-    println!();
+    let stw_status = StartTraceW( &mut session_handle, PCWSTR(session_name.as_ptr()), props);
+    if stw_status.0 != ERROR_SUCCESS.0{
+        println!("StartTraceW failed: {:?}", stw_status);
+    }
     }
 
-return session_handle;
+    return session_handle;
 }
 
-pub fn enable_provider(session_handle: CONTROLTRACE_HANDLE){
+pub fn _enable_provider(session_handle: CONTROLTRACE_HANDLE){
 
         unsafe{
         let etx_msg = EnableTraceEx2(
