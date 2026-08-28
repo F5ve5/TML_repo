@@ -17,6 +17,7 @@ pub fn start_session(session_name: &[u16]) -> CONTROLTRACE_HANDLE {
     (*props).Wnode.BufferSize = buffer_size as u32;
     (*props).Wnode.Guid = SystemTraceControlGuid;
     (*props).Wnode.Flags = WNODE_FLAG_TRACED_GUID;
+    (*props).Wnode.ClientContext = 2;
   
     (*props).LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
     (*props).LoggerNameOffset = etp_size as u32;

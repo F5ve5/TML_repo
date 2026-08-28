@@ -1,20 +1,11 @@
 use crate::{cypher, files::{bin_read_unread, bin_write}, misc, pref::{WANTED_EVENT_HEADER_INFO, WANTED_PROPS}};
 
+use egui::Event;
 use windows::Win32::System::Diagnostics::Etw::*;
-use std::mem::size_of_val;
+use std::{mem::size_of_val};
 
 #[inline]
-pub fn unbin_events() -> UERet{
-
-    let bin_vec = match bin_read_unread() {
-        Ok(v) => v,
-        Err(e) => {
-            println!("bin_read_unread failed in unbin_events: {:?}", e);
-            return UERet {
-                events: Vec::new(),
-            };
-        }
-    };
+pub fn unbin_events(bin_vec: &[u8]) -> Vec<EventFinal>{
 
     let mut ef_vec: Vec<EventFinal> = Vec::new();
 
@@ -36,6 +27,8 @@ pub fn unbin_events() -> UERet{
         let mut ehvf_vec: Vec<EventHeaderValueFinal> = Vec::new();
         let mut epf_vec: Vec<EventPropertyFinal> = Vec::new();
 
+        let mut ef = EventFinal::default();
+
         current_byte += 1;
 
         event_bytelen = u32::from_le_bytes([bin_vec[1], bin_vec[2], bin_vec[3], bin_vec[4]]);
@@ -54,11 +47,43 @@ pub fn unbin_events() -> UERet{
             header_value = &bin_vec[current_byte..(current_byte + header_value_size as usize)];
                 current_byte += header_value_size as usize;
 
+            if header_value_index == 5{
+                ef.process_id = u32::from_le_bytes([
+                header_value[current_byte], 
+                header_value[current_byte + 1], 
+                header_value[current_byte + 2], 
+                header_value[current_byte + 3],
+                ]);
+                    current_byte += 4;
+                continue;
+            }
+            if header_value_index == 6 {
+                ef.timestamp = u64::from_le_bytes([
+                header_value[current_byte], 
+                header_value[current_byte + 1], 
+                header_value[current_byte + 2], 
+                header_value[current_byte + 3], 
+                header_value[current_byte + 4], 
+                header_value[current_byte + 5], 
+                header_value[current_byte + 6], 
+                header_value[current_byte + 7]
+                ]);
+                    current_byte += 8;
+                continue;
+            }
+            if header_value_index == 12 {
+                ef.opcode = header_value[current_byte];
+                    current_byte += 1;
+
+                continue;
+            }
+            
             ehvf_vec.push(EventHeaderValueFinal{
                 index: header_value_index,
                 value: header_value.to_vec()
             });
         }
+        ef.other_header_values = ehvf_vec;
 
         while (current_byte as u32) < event_bytelen{
             property_name_index = bin_vec[current_byte];
@@ -76,36 +101,36 @@ pub fn unbin_events() -> UERet{
                 value: property_value_buffer.to_vec()
             });
         }
+        ef.properties = epf_vec;
 
-        ef_vec.push(EventFinal{
-            header_values: ehvf_vec,
-            properties: epf_vec
-        });
+        ef_vec.push(ef);
     }
 
-    return UERet{
-        events: ef_vec
-    };
+    ef_vec
 }
 #[derive(Debug)]
+#[derive(Clone)]
 pub struct EventHeaderValueFinal{
-    index: u8,
-    value: Vec<u8>,
+    pub index: u8,
+    pub value: Vec<u8>,
 }
 #[derive(Debug)]
+#[derive(Clone)]
 pub struct EventPropertyFinal{
-    name_index: u8,
-    type_index: u8,
-    value: Vec<u8>
+    pub name_index: u8,
+    pub type_index: u8,
+    pub value: Vec<u8>
 }
 #[derive(Debug)]
+#[derive(Default)]
+#[derive(Clone)]
 pub struct EventFinal{
-    header_values: Vec<EventHeaderValueFinal>,
-    properties: Vec<EventPropertyFinal>
-}
-#[derive(Debug)]
-pub struct UERet{
-    events: Vec<EventFinal>,
+    pub other_header_values: Vec<EventHeaderValueFinal>,
+    pub timestamp: u64,
+    pub opcode: u8,
+    pub process_id: u32,
+    
+    pub properties: Vec<EventPropertyFinal>,
 }
 
 #[inline]

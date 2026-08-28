@@ -9,13 +9,13 @@ mod eguiloop;
 
 use std::{thread,sync::{OnceLock,mpsc}};
 
-pub static TX0_SET_UP_TRACE: OnceLock<mpsc::Sender<biner::UERet>> = OnceLock::new();
-pub fn main() {
+use crate::files::{bin_read_unread,bin_write,bin_establish};
 
-    let (tx0, rx0) = std::sync::mpsc::channel::<biner::UERet>();
+pub static SESSION_TX: OnceLock<mpsc::Sender<Vec<u8>>> = OnceLock::new();
 
-    TX0_SET_UP_TRACE.set(tx0).unwrap();
-
+pub fn main(){
+    let (tx0, rx0) = std::sync::mpsc::channel::<Vec<u8>>();
+    SESSION_TX.set(tx0).unwrap();
     thread::spawn(move || {
 
         let session_name_r: &str = "NT Kernel Logger";
@@ -31,15 +31,34 @@ pub fn main() {
         println!("Handle: {:?}", consumer_handle);
         println!();
 
-        let be_res = files::bin_establish();
+        println!("3. Bin file");
+        let be_res = bin_establish();
         match be_res{
-            Ok(()) => (),
-            Err(e) => println!("be: {:?}", e)
+            Ok(()) => println!("Successfully established bin file"),
+            Err(e) => println!("Could not establish bin file: {:?}", e)
         };
+        println!();
 
         consumer::trace_loop(consumer_handle);
-    }
-    );
+    });
+    thread::spawn(move || {
+        loop{
+            match bin_write(&rx0.recv().unwrap()){
+                Ok(_) => {},
+                Err(e) => println!("bin_write failed: {}", e)
+            };
+        }
+    });
 
-    eguiloop::start_egui();
+    let (tx1, rx1) = std::sync::mpsc::channel::<Vec<biner::EventFinal>>();
+    thread::spawn(move || {
+        loop{
+            thread::sleep(std::time::Duration::from_millis(3000));
+            let bin_vec = bin_read_unread().unwrap();
+            let event_vec = biner::unbin_events(&bin_vec);
+            println!("events: {:?}", event_vec);
+            tx1.send(event_vec).unwrap();
+        }
+    });
+    eguiloop::start_egui(rx1);
 }

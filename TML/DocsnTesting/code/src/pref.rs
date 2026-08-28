@@ -1,36 +1,5 @@
-// Property indexes and their typical type
-// 0 UniqueProcessKey Bytes
-// 1 ProcessId U32
-// 2 ParentId U32
-// 3 SessionId U32
-// 4 ExitStatus I32
-// 5 DirectoryTableBase Bytes
-// 6 Flags U32
-// 7 UserSID Byees
-// 8 ImageFileName Bytes
-// 9 CommandLine String
-// 10 PackageFullName String
-// 11 ApplicationId String
-// 12 Unknown 0
-pub const WANTED_PROPS: [bool; 13] = [
-    false,
-    true,
-    true,
-    true,
-    false,
-    false,
-    false,
-    false,
-    true,
-    true,
-    false,
-    false,
-    false
-];
-
 // EVENT_HEADER
-// 0 Size u16
-// 1 HeaderType u16
+// 0 Size// 1 HeaderType u16
 // 2 Flags u16
 // 3 EventProperty u16
 // 4 ThreadId u32
@@ -64,4 +33,34 @@ pub const WANTED_EVENT_HEADER_INFO: [bool; 17] = [
     false,
     true,
     true,
+];
+
+// Property indexes and their typical type
+// 0 UniqueProcessKey Bytes
+// 1 ProcessId U32
+// 2 ParentId U32
+// 3 SessionId U32
+// 4 ExitStatus I32
+// 5 DirectoryTableBase Bytes
+// 6 Flags U32
+// 7 UserSID Byees
+// 8 ImageFileName Bytes
+// 9 CommandLine String
+// 10 PackageFullName String
+// 11 ApplicationId String
+// 12 Unknown 0
+pub const WANTED_PROPS: [bool; 13] = [
+    false,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    true,
+    true,
+    false,
+    false,
+    false
 ];

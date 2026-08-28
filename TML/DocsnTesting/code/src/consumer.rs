@@ -1,12 +1,10 @@
-use crate::{biner, cypher, files, pref};
+use crate::{SESSION_TX, biner, cypher, main, pref};
 
-use std::ops::Sub;
 use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS};
 use windows::Win32::System::Diagnostics::Etw::*;
 use windows::core::PWSTR;
 
-pub fn open_trace(session_name: &[u16]) -> PROCESSTRACE_HANDLE {
-    
+pub fn open_trace(session_name: &[u16]) -> PROCESSTRACE_HANDLE {  
     let mut logfile = EVENT_TRACE_LOGFILEW::default();
     
     logfile.LoggerName = PWSTR(session_name.as_ptr() as *mut u16);
@@ -34,7 +32,7 @@ pub fn trace_loop(consumer_handle: PROCESSTRACE_HANDLE) {
 }
 
 #[inline]
-extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
+extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD) {
     let mut bin_vec: Vec<u8> = Vec::new();
     bin_vec.extend_from_slice(&[0u8; 5]);
     unsafe{
@@ -136,10 +134,6 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
     bin_vec[0] = 255;
     let bv_len_from_255 = bin_vec.len() as u32;
     bin_vec[1..5].copy_from_slice(&bv_len_from_255.to_le_bytes());
-    match files::bin_write(&bin_vec){
-        Ok(()) => (),
-        Err(e) => println!("bin_write failed in gimme_eventdata: {:?}", e)
-    }
 
-    println!("{:?}",biner::unbin_events());
+    SESSION_TX.get().unwrap().send(bin_vec).unwrap();
 }
