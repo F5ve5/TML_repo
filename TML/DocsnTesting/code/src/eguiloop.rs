@@ -27,6 +27,10 @@ struct AppState{
     //Event Viewer state
     written_event_selected: u32,
     ////
+    
+    //Other
+    current_bucket: u64,
+    ////
 }
 
 impl AppState {
@@ -49,10 +53,12 @@ impl AppState {
             diagram_zoom_z: 1.0,
 
             written_event_selected: 0,
+
+            current_bucket: 0,
         }
     }
 
-    fn process_events(&mut self) {
+    fn process_events_loop(&mut self) {
         while let Ok(event_vec) = self.event_receiver_rx.try_recv() {
             for event in event_vec {
                 match event.opcode {
@@ -78,8 +84,12 @@ impl AppState {
         .push(pid);
     }
 
-    fn update_timeline(&mut self){
+    fn fill_buckets_loop(&mut self,loop_lim:u64){
+        if let Some((k, _)) = self.pids_by_end.first_key_value() && self.current_bucket == 0{
+            self.current_bucket = *k;
+        }
 
+        let bucketeer = Vec<u32> = Vec::new();
     }
 }
 
