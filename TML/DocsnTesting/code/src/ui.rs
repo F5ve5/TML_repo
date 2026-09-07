@@ -29,7 +29,7 @@ struct AppState{
     ////
     
     //Other
-    current_bucket: u64,
+    first_event_time: u64,
     ////
 }
 
@@ -54,7 +54,7 @@ impl AppState {
 
             written_event_selected: 0,
 
-            current_bucket: 0,
+            first_event_time: 0,
         }
     }
 
@@ -85,11 +85,20 @@ impl AppState {
     }
 
     fn fill_buckets_loop(&mut self,loop_lim:u64){
-        if let Some((k, _)) = self.pids_by_end.first_key_value() && self.current_bucket == 0{
-            self.current_bucket = *k;
+        if let Some((k, _)) = self.pids_by_start.first_key_value() && self.first_event_time == 0{
+            self.first_event_time = *k;
         }
 
-        let bucketeer = Vec<u32> = Vec::new();
+    for n in 0u64..360 {
+        let bucket_start = self.first_event_time + n * 100_000_000;
+        let bucket_end = start + 100_000_000;
+
+        for (time, pids) in self.pids_by_start.range(start..end) {
+            
+        }
+        for (time, pids) in self.pids_by_end.range(start..end) {
+
+        }
     }
 }
 

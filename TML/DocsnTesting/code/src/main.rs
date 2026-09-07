@@ -5,17 +5,19 @@ mod pref;
 mod biner;
 mod files;
 mod cypher;
-mod eguiloop;
+mod ui;
+mod ui_processing;
 
 use std::{thread,sync::{OnceLock,mpsc}};
 
 use crate::files::{bin_read_unread,bin_write,bin_establish};
 
-pub static SESSION_TX: OnceLock<mpsc::Sender<Vec<u8>>> = OnceLock::new();
+//Special case of needing to make the tx public because the signature of the function that uses it is set in stone
+pub static TX0: OnceLock<mpsc::Sender<Vec<u8>>> = OnceLock::new();
 
 pub fn main(){
     let (tx0, rx0) = std::sync::mpsc::channel::<Vec<u8>>();
-    SESSION_TX.set(tx0).unwrap();
+    TX0.set(tx0).unwrap();
     thread::spawn(move || {
 
         let session_name_r: &str = "NT Kernel Logger";
@@ -43,22 +45,17 @@ pub fn main(){
     });
     thread::spawn(move || {
         loop{
-            match bin_write(&rx0.recv().unwrap()){
-                Ok(_) => {},
-                Err(e) => println!("bin_write failed: {}", e)
-            };
+            bin_write(&rx0.recv().unwrap()).unwrap();
         }
     });
 
-    let (tx1, rx1) = std::sync::mpsc::channel::<Vec<biner::EventFinal>>();
+    let (tx1, rx1) = std::sync::mpsc::channel::<UiPayload>();
     thread::spawn(move || {
         loop{
-            thread::sleep(std::time::Duration::from_millis(3000));
             let bin_vec = bin_read_unread().unwrap();
-            let event_vec = biner::unbin_events(&bin_vec);
-            println!("events: {:?}", event_vec);
-            tx1.send(event_vec).unwrap();
+            let events = biner::unbin_events(&bin_vec);
+            tx1.send(ui_processing::process_ui(events)).unwrap();
         }
     });
-    eguiloop::start_egui(rx1);
+    ui::start_egui(rx1);
 }
