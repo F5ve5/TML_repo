@@ -1,7 +1,19 @@
-use crate::{SESSION_TX, biner, cypher, main, pref};
+use crate::biner::EventFinal;
+use crate::{TX0, biner, cypher, pref};
 
-use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS};
+use windows::Win32::Foundation::{
+    ERROR_INSUFFICIENT_BUFFER,
+    ERROR_SUCCESS,
+};
+
 use windows::Win32::System::Diagnostics::Etw::*;
+
+use ntapi::ntexapi::{
+    NtQuerySystemInformation,
+    SYSTEM_PROCESS_INFORMATION,
+    SystemProcessInformation
+};
+
 use windows::core::PWSTR;
 
 pub fn open_trace(session_name: &[u16]) -> PROCESSTRACE_HANDLE {  
@@ -32,7 +44,7 @@ pub fn trace_loop(consumer_handle: PROCESSTRACE_HANDLE) {
 }
 
 #[inline]
-extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD) {
+extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
     let mut bin_vec: Vec<u8> = Vec::new();
     bin_vec.extend_from_slice(&[0u8; 5]);
     unsafe{
@@ -75,7 +87,7 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD) {
     );
     //
     
-    for (i, prop_tei) in props_tei.iter().enumerate() {
+    for prop_tei in props_tei.iter() {
         
         ////
         let prop_name_ptr = ((tei as *const u8).add(prop_tei.NameOffset as usize)) as *const u16;
@@ -125,9 +137,9 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD) {
             bin_vec.extend_from_slice(&biner::bin_event_property(pni, pti, &prop_buf));
 
             //println!("Decoded property #{} {}", i, misc::utf16_to_r_string(prop_name_ptr as *const 
+        }else{           
+            //println!("Unwanted property #{} {}", i, misc::utf16_to_r_string(prop_name_ptr as *const u16));
         };
-
-        //println!("Unwanted property #{} {}", i, misc::utf16_to_r_string(prop_name_ptr as *const u16));
     }
     }
 
@@ -135,5 +147,87 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD) {
     let bv_len_from_255 = bin_vec.len() as u32;
     bin_vec[1..5].copy_from_slice(&bv_len_from_255.to_le_bytes());
 
-    SESSION_TX.get().unwrap().send(bin_vec).unwrap();
+    TX0.get().unwrap().send(bin_vec).unwrap();
+}
+
+pub fn trace_snapshot() -> Vec<EventFinal> {
+    use std::ptr::null_mut;
+
+    unsafe {
+        let mut needed = 0u32;
+        let _status0 = NtQuerySystemInformation(
+            SystemProcessInformation,
+            null_mut(),
+            0,
+            &mut needed,
+        );
+
+        let mut buffer = vec![0u8; needed as usize];
+
+        let status1 = NtQuerySystemInformation(
+            SystemProcessInformation,
+            buffer.as_mut_ptr() as *mut _,
+            needed,
+            &mut needed,
+        );
+        if status1 < 0 {
+            panic!("NtQuerySystemInformation failed: {:?}", status1);
+        }
+
+        let mut events: Vec<EventFinal> = Vec::new();
+        let mut offset = 0usize;
+
+        loop {
+            let spi = &*(buffer.as_ptr().add(offset) as *const SYSTEM_PROCESS_INFORMATION);
+
+            let pid = spi.UniqueProcessId as usize as u32;
+            let ppid = spi.InheritedFromUniqueProcessId as usize as u32;
+
+            // FILETIME timestamp (100ns ticks since 1601)
+            let i64_timestamp = spi.CreateTime.QuadPart();
+            let timestamp = u64::try_from(*i64_timestamp).unwrap();
+
+            let image_name = if spi.ImageName.Buffer.is_null() {
+                "<System>".to_string()
+            } else {
+                let chars = std::slice::from_raw_parts(
+                    spi.ImageName.Buffer,
+                    (spi.ImageName.Length / 2) as usize,
+                );
+                String::from_utf16_lossy(chars)
+            };
+
+            let event = EventFinal {
+                other_header_values: Vec::new(),
+                timestamp,
+                opcode: 1, // snapshot = synthetic ProcessStart
+                process_id: pid,
+                properties: vec![
+                    // ParentId
+                    biner::EventPropertyFinal {
+                        name_index: 2,
+                        type_index: 2,
+                        value: ppid.to_le_bytes().to_vec(),
+                    },
+
+                    // ImageFileName
+                    biner::EventPropertyFinal {
+                        name_index: 8,
+                        type_index: 18,
+                        value: image_name.into_bytes(),
+                    },
+                ],
+            };
+
+            events.push(event);
+
+            if spi.NextEntryOffset == 0 {
+                break;
+            }
+
+            offset += spi.NextEntryOffset as usize;
+        }
+
+        events
+    }
 }

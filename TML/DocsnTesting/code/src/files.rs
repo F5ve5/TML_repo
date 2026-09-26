@@ -1,12 +1,12 @@
 use std::{fs::{File, OpenOptions},io::{Error, ErrorKind, Read, Result, Seek, SeekFrom, Write},sync::{Mutex, OnceLock}};
 
+static BIN: OnceLock<Mutex<Bin>> = OnceLock::new();
+
 struct Bin {
     file: File,
     bookmark: u64,
     verified_len: u64
 }
-
-static BIN: OnceLock<Mutex<Bin>> = OnceLock::new();
 
 pub fn bin_establish() -> Result<()> {
     let filename = chrono::Local::now()

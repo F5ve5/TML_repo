@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 windows = { version = ">=0.59, <=0.62", features = ["Win32_System_Diagnostics_Etw", "Win32_System_Time", "Win32_Foundation"] }
+ntapi = "0.4.3"
 chrono = "0.4.45"
 eframe = "0.36.1"
 egui = "0.36.1"

@@ -1,5 +1,6 @@
 // EVENT_HEADER
-// 0 Size// 1 HeaderType u16
+// 0 Size
+// 1 HeaderType u16
 // 2 Flags u16
 // 3 EventProperty u16
 // 4 ThreadId u32
@@ -64,3 +65,5 @@ pub const WANTED_PROPS: [bool; 13] = [
     false,
     false
 ];
+
+pub const BINARY_ENCODING: bool = true;

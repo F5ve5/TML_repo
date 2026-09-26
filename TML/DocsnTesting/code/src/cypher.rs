@@ -64,6 +64,7 @@ pub enum PropertyNameIndex {
 // SystemTime = 15
 // Hex        = 16
 // Binary     = 17
+// Regular rust string = 18
 //Similarily to the function above, this function takes the necessary data to understand the type of the property it's
 //from and converts it into a u8 which represents an index in the enum cypher::PropertyValue, as also shown above.
 //Written mostly by AI btw, since I don't want to learn type the type philosophy of TDH myself

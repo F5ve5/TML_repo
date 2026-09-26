@@ -1,4 +1,4 @@
-use crate::biner;
+use crate::{biner,ui_preproc::UiLoad,ui_postproc::MergeOpcode};
 
 use std::{collections::{BTreeMap, HashMap}, sync::mpsc};
 use eframe::egui;
@@ -6,15 +6,9 @@ use egui::Ui;
 
 struct AppState{
     //Events
-    received_events: Vec<biner::EventFinal>,
-
-    total_events: HashMap<u32, biner::EventFinal>,
-
-    pids_at_given_time: BTreeMap<u64, Vec<u32>>,
-    pids_by_start: BTreeMap<u64, Vec<u32>>,
-    pids_by_end: BTreeMap<u64, Vec<u32>>,
-
-    event_receiver_rx: std::sync::mpsc::Receiver<Vec<biner::EventFinal>>,
+    shown_payload: UiLoad,
+    request_tx: mpsc::Sender<MergeOpcode>,
+    data_rx: mpsc::Receiver<UiLoad>,
     ////
 
     //Diagram state
@@ -27,25 +21,14 @@ struct AppState{
     //Event Viewer state
     written_event_selected: u32,
     ////
-    
-    //Other
-    first_event_time: u64,
-    ////
 }
 
 impl AppState {
-    fn new(_cc: &eframe::CreationContext<'_>,rx: mpsc::Receiver<Vec<biner::EventFinal>>,) -> Self{
+    fn new(_cc: &eframe::CreationContext<'_>,request_tx: mpsc::Sender<MergeOpcode>,data_rx: mpsc::Receiver<UiLoad>) -> Self{
         Self {
-            received_events: Vec::new(),
-
-            total_events: HashMap::new(),
-
-            pids_at_given_time: BTreeMap::new(),
-
-            pids_by_start: BTreeMap::new(),
-            pids_by_end: BTreeMap::new(),
-
-            event_receiver_rx: rx,
+            shown_payload: UiLoad::default(),
+            request_tx: request_tx,
+            data_rx: data_rx,
 
             diagram_cursor_pos: 0.0,
             diagram_zoom_x: 1.0,
@@ -54,52 +37,11 @@ impl AppState {
 
             written_event_selected: 0,
 
-            first_event_time: 0,
         }
     }
 
-    fn process_events_loop(&mut self) {
-        while let Ok(event_vec) = self.event_receiver_rx.try_recv() {
-            for event in event_vec {
-                match event.opcode {
-                    1 => self.mark_start(event),
-                    2 => self.mark_end(event.process_id,event.timestamp),
-                    _ => {}
-                }
-            }
-        }
-    }
 
-    fn mark_start(&mut self,e:biner::EventFinal) {    
-    self.pids_by_start
-        .entry(e.timestamp)
-        .or_default()
-        .push(e.process_id);
-    }
 
-    fn mark_end(&mut self,pid:u32,t:u64) {    
-    self.pids_by_end
-        .entry(t)
-        .or_default()
-        .push(pid);
-    }
-
-    fn fill_buckets_loop(&mut self,loop_lim:u64){
-        if let Some((k, _)) = self.pids_by_start.first_key_value() && self.first_event_time == 0{
-            self.first_event_time = *k;
-        }
-
-    for n in 0u64..360 {
-        let bucket_start = self.first_event_time + n * 100_000_000;
-        let bucket_end = start + 100_000_000;
-
-        for (time, pids) in self.pids_by_start.range(start..end) {
-            
-        }
-        for (time, pids) in self.pids_by_end.range(start..end) {
-
-        }
-    }
 }
 
 
@@ -113,7 +55,7 @@ impl eframe::App for AppState {
     }
 }
 
-pub fn start_egui(event_receiver_rx: mpsc::Receiver<Vec<biner::EventFinal>>){
+pub fn start_egui(request_tx: mpsc::Sender<MergeOpcode>,data_rx: mpsc::Receiver<UiLoad>){
     
     let options = eframe::NativeOptions::default();
 
@@ -121,7 +63,7 @@ pub fn start_egui(event_receiver_rx: mpsc::Receiver<Vec<biner::EventFinal>>){
         "ProcessGaze",
         options,
         Box::new(move |_cc| {
-            Ok(Box::new(AppState::new(_cc, event_receiver_rx)))
+            Ok(Box::new(AppState::new(_cc, request_tx, data_rx)))
         }),
     ).unwrap();
 }
