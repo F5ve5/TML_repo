@@ -1,6 +1,5 @@
-use crate::{cypher, files::{bin_read_unread, bin_write}, misc, pref::{WANTED_EVENT_HEADER_INFO, WANTED_PROPS}};
+use crate::{cypher, misc, pref::{WANTED_EVENT_HEADER_INFO, WANTED_PROPS}};
 
-use egui::Event;
 use windows::Win32::System::Diagnostics::Etw::*;
 use std::{mem::size_of_val};
 
@@ -49,32 +48,28 @@ pub fn unbin_events(bin_vec: &[u8]) -> Vec<EventFinal>{
 
             if header_value_index == 5{
                 ef.process_id = u32::from_le_bytes([
-                header_value[current_byte], 
-                header_value[current_byte + 1], 
-                header_value[current_byte + 2], 
-                header_value[current_byte + 3],
+                header_value[0], 
+                header_value[1], 
+                header_value[2], 
+                header_value[3],
                 ]);
-                    current_byte += 4;
                 continue;
             }
             if header_value_index == 6 {
                 ef.timestamp = u64::from_le_bytes([
-                header_value[current_byte], 
-                header_value[current_byte + 1], 
-                header_value[current_byte + 2], 
-                header_value[current_byte + 3], 
-                header_value[current_byte + 4], 
-                header_value[current_byte + 5], 
-                header_value[current_byte + 6], 
-                header_value[current_byte + 7]
+                header_value[0], 
+                header_value[1], 
+                header_value[2], 
+                header_value[3], 
+                header_value[4], 
+                header_value[5], 
+                header_value[6], 
+                header_value[7]
                 ]);
-                    current_byte += 8;
                 continue;
             }
             if header_value_index == 12 {
-                ef.opcode = header_value[current_byte];
-                    current_byte += 1;
-
+                ef.opcode = header_value[0];
                 continue;
             }
             

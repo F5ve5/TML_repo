@@ -40,10 +40,9 @@ pub fn main(){
     println!();
 
     println!("4. Other globals");
-    match ui_preproc::init_globals(){
-        Ok(()) => println!("Successfully established ui globals"),
-        Err(e) => println!("Could not establish ui globals: {:?}", e)
-    };
+    ui_preproc::init_globals();
+    ui_postproc::init_globals();
+    println!("Successfully established ui globals");
     println!();
 
     println!("5. Spawning threads...");
@@ -60,14 +59,15 @@ pub fn main(){
             
             let events = biner::unbin_events(&bin_vec);
             ui_preproc::process_etw(events);
+            ui_preproc::merge_to_postproc();
         }
     });
     let (tx1, rx1) = std::sync::mpsc::channel::<ui_postproc::MergeOpcode>();
-    let (tx2, rx2) = std::sync::mpsc::channel::<ui_preproc::UiLoad>();
+    let (tx2, rx2) = std::sync::mpsc::channel::<ui_postproc::ULWithContentLabel>();
     thread::spawn(move || {
         loop{
             match rx1.recv(){
-                Ok(mo) => {tx2.send(ui_postproc::get_payload(mo));},
+                Ok(mo) => {tx2.send(ui_postproc::get_payload(mo)).unwrap();},
                 Err(_) => {}
             }
         }
