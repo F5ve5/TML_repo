@@ -63,7 +63,7 @@ pub fn main(){
         }
     });
     let (tx1, rx1) = std::sync::mpsc::channel::<ui_postproc::MergeOpcode>();
-    let (tx2, rx2) = std::sync::mpsc::channel::<ui_postproc::ULWithContentLabel>();
+    let (tx2, rx2) = std::sync::mpsc::channel::<ui_postproc::UiPayload>();
     thread::spawn(move || {
         loop{
             match rx1.recv(){

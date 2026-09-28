@@ -5,10 +5,10 @@ use crate::{biner::EventFinal,misc::round_filetime_to_nearest_second,ui_postproc
 #[derive(Default, Debug, Clone)]
 pub struct UiLoad{
     pub delta_map: BTreeMap<u64,i32>,
-    pub timeline: BTreeMap<u64,Vec<u32>>,
+    pub length_map: BTreeMap<u64,i32>,
     pub events_by_prid: Vec<EventFinal>,
     pub pre_snapshot_events: HashMap<PidPlusOpcode,EventFinal>,
-    pub snapshot_done: bool,
+    pub initial_event_amount: i32,
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -32,7 +32,7 @@ pub fn init_globals() {
     LOCAL_UI_PAYLOAD.with(|cell| {
         let mut lup = cell.borrow_mut();
         *lup = UiLoad::default();
-        lup.snapshot_done = false;
+        lup.initial_event_amount = -1;
     });
 }
 
@@ -48,24 +48,19 @@ pub fn process_snapshot(events: Vec<EventFinal>) {
             );
         }
 
-        let pse = lup.pre_snapshot_events.clone();
+        let pse_vec: Vec<EventFinal> = lup.pre_snapshot_events.values().cloned().collect();
         //Necessary because I can't run iter() or into_iter() on lup
 
-        for (_, e) in pse {
-            match e.opcode {
-                1 => update_delta_map(lup, &e.timestamp, true),
-                2 => update_delta_map(lup, &e.timestamp, false),
-                _ => {}
-            }
-        }
+        lup.initial_event_amount = pse_vec.len() as i32;
 
-        lup.snapshot_done = true;
+        update_lup(pse_vec);
     });
 }
 #[inline]
 pub fn process_etw(events: Vec<EventFinal>) {
+
     with_lup(|lup| {
-        if !lup.snapshot_done {
+        if lup.initial_event_amount == -1 {
             for e in events {
                 lup.pre_snapshot_events.insert(
                     PidPlusOpcode {
@@ -76,28 +71,44 @@ pub fn process_etw(events: Vec<EventFinal>) {
                 );
             }
         } else {
-            for e in events {
-                match e.opcode {
-                    1 => update_delta_map(lup,&e.timestamp, true),
-                    2 => update_delta_map(lup,&e.timestamp, false),
-                    _ => {}
-                }
-            }
+            update_lup(events);
         }
     });
 }
 
 #[inline]
-pub fn update_delta_map(closure_lup: &mut UiLoad,t: &u64, positive: bool) {
+fn update_lup(new_events: Vec<EventFinal>){
 
-    let rounded = round_filetime_to_nearest_second(t);
-    let time = closure_lup.delta_map.entry(rounded).or_default();
+    let mut new_events_rounded: BTreeMap<u64,i32> = BTreeMap::new();
+    for new_event in new_events{
+        let rounded_ne = round_filetime_to_nearest_second(&new_event.timestamp);
+        let rounded_ne_plus_one = round_filetime_to_nearest_second(&new_event.timestamp) + 10_000_000;
+        if new_event.opcode == 1{
+            *new_events_rounded.entry(rounded_ne).or_default() += 1;
+            with_lup(|lup|{*lup.delta_map.entry(rounded_ne).or_default() += 1});
 
-    if positive {
-        *time += 1;
-    } else {
-        *time -= 1;
+
+        }else if new_event.opcode == 2{
+            *new_events_rounded.entry(rounded_ne_plus_one).or_default() -= 1;
+            with_lup(|lup|{*lup.delta_map.entry(rounded_ne_plus_one).or_default() -= 1});
+        }else{
+
+        }
     }
+    let mut first_ner = new_events_rounded.first_key_value().unwrap().0.clone();
+    let last_ner = new_events_rounded.last_key_value().unwrap().0;
+    let mut lm_iteration_value: i32 = 0;
+    while first_ner >= *last_ner{
+        match new_events_rounded.get_key_value(&first_ner){
+            Some(ne_pair) => lm_iteration_value += ne_pair.1,
+            None => {}
+        }
+
+        with_lup(|lup|*lup.length_map.entry(first_ner).or_default() += lm_iteration_value);
+
+        first_ner += 10_000_000;
+    }
+
 }
 
 pub fn merge_to_postproc(){
@@ -107,9 +118,9 @@ pub fn merge_to_postproc(){
     //})
     //Here's the fix:
 
-    let snapshot = with_lup(|lup| lup.clone());
+    let lup = with_lup(|lup| lup.clone());
 
     with_rup(|rup| {
-        *rup = snapshot;
+        *rup = lup;
     });
 }

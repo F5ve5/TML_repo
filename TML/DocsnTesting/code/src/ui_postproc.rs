@@ -1,6 +1,6 @@
-use crate::{ui_preproc::UiLoad};
+use crate::{biner::EventFinal, ui_preproc::UiLoad};
 
-use std::sync::{OnceLock,Mutex};
+use std::{{collections::BTreeMap},sync::{OnceLock,Mutex}};
 
 pub static READY_UI_PAYLOAD: OnceLock<Mutex<UiLoad>> = OnceLock::new();
 pub fn with_rup<R>(f: impl FnOnce(&mut UiLoad) -> R) -> R {
@@ -15,23 +15,23 @@ pub fn init_globals(){
         .expect("READY_UI_PAYLOAD already initialized");
 }
 
-pub fn get_payload(opcode: MergeOpcode) -> ULWithContentLabel{
+pub fn get_payload(opcode: MergeOpcode) -> UiPayload{
 
-    let mut tx_ul = UiLoad::default();
+    let mut tx_up: UiPayload = UiPayload::I32(0);
 
     with_rup(|rup|{
-            match opcode.load_type{
-        0 => {
-            tx_ul.delta_map = rup.delta_map.clone();
-        },
-        _ => {}
-    }
+        match opcode.load_type{
+            0 => {
+                UiPayload::delta_map(rup.length_map.clone())
+            },
+            1 => {
+                UiPayload::I32(rup.initial_event_amount.clone())
+            }
+            _ => {
+                UiPayload::null(0)
+            }
+        }
     });
-    
-    ULWithContentLabel{
-        ui_load: tx_ul,
-        content_label: opcode.load_type
-    }
 }
 #[derive(Default,Clone)]
 pub struct MergeOpcode{
@@ -40,10 +40,13 @@ pub struct MergeOpcode{
     pub indicator1: u64,
     pub indicator2: u64,
 }
-#[derive(Default,Clone)]
-pub struct ULWithContentLabel{
-    ui_load: UiLoad,
-    content_label: u8
+#[repr(u8)]
+pub enum UiPayload{
+    I32(i32) = 0,
+    events(Vec<EventFinal>) = 1,
+    delta_map(BTreeMap<u64,i32>) = 2,
+    length_map(BTreeMap<u64,i32>) = 3,
+    null(u8) = 255
 }
 //How the merge-opcode works is that an initialized version of it is sent from the UI thread to this thread whose only purpose is to give information to said UI thread. The following is an explanation of how the merge-opcode works:
 //
@@ -53,5 +56,5 @@ pub struct ULWithContentLabel{
 //
 //load_type
 //0 = delta_map
-//
+//1 = initial_event_amount
 //For the first load-type, the three indicators do nothing and the entire BTreeMap is sent over by the TX

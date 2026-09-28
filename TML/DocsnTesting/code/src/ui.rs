@@ -1,6 +1,6 @@
-use crate::{ui_preproc::UiLoad,ui_postproc::{MergeOpcode,ULWithContentLabel}};
+use crate::{ui_preproc::UiLoad,ui_postproc::{MergeOpcode,UiPayload}};
 
-use std::{collections::{BTreeMap, HashMap}, sync::mpsc};
+use std::{collections::{BTreeMap}, sync::mpsc};
 use eframe::egui;
 use egui::Ui;
 
@@ -9,8 +9,14 @@ struct AppState{
     shown_payload: UiLoad,
 
     request_tx: mpsc::Sender<MergeOpcode>,
-    payload_rx: mpsc::Receiver<ULWithContentLabel>,
+    payload_rx: mpsc::Receiver<UiPayload>,
     current_request: Option<MergeOpcode>,
+
+    current_payload: Option<UiPayload>,
+    ////
+    
+    //Dependent States
+    length_map: Option<BTreeMap<u64,i32>>,
     ////
 
     //Diagram state
@@ -22,38 +28,41 @@ struct AppState{
 }
 
 impl AppState {
-    fn new(_cc: &eframe::CreationContext<'_>,request_tx: mpsc::Sender<MergeOpcode>,payload_rx: mpsc::Receiver<ULWithContentLabel>) -> Self{
+    fn new(_cc: &eframe::CreationContext<'_>,request_tx: mpsc::Sender<MergeOpcode>,payload_rx: mpsc::Receiver<UiPayload>) -> Self{
         Self {
             shown_payload: UiLoad::default(),
 
             request_tx: request_tx,
             payload_rx: payload_rx,
-            current_request: Some(MergeOpcode::default()),
+            current_request: None,
+
+            current_payload: None,
+
+            length_map: None,
 
             diagram_cursor_pos: 0.0,
             diagram_zoom_x: 1.0,
             diagram_zoom_y: 1.0,
             diagram_zoom_z: 1.0,
         }
-    }
-
-    fn request_payload(&mut self){
-        if !self.current_request.is_none(){
-            self.request_tx.send(self.current_request.clone().unwrap()).unwrap();
-
-        }
-    }
-
+    } 
 }
 
 
 impl eframe::App for AppState {
     fn ui(&mut self,ctx: &mut Ui,_frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ctx, |_ui| {
+            if let Ok(payload) = self.payload_rx.try_recv(){
+                self.current_payload = Some(payload);
+            }
 
-            ui.heading("Hello World!");
-            std::thread::sleep(core::time::Duration::from_millis(2000));
+            if let Some(UiPayload::length_map(lm)) = &self.current_payload{
+                
+            }
+            //Update dependent UI...
 
+            //Change request according to user input...
+            
             if !self.current_request.is_none(){
                 self.request_tx.send(self.current_request.clone().unwrap()).unwrap();
             }
@@ -61,7 +70,7 @@ impl eframe::App for AppState {
     }
 }
 
-pub fn start_egui(request_tx: mpsc::Sender<MergeOpcode>,payload_rx: mpsc::Receiver<ULWithContentLabel>){
+pub fn start_egui(request_tx: mpsc::Sender<MergeOpcode>,payload_rx: mpsc::Receiver<UiPayload>){
     
     let options = eframe::NativeOptions::default();
 
