@@ -1,76 +1,126 @@
-use crate::{ui_preproc::UiLoad,ui_postproc::{MergeOpcode,UiPayload}};
+use crate::{ui_postproc::{self, UPOpcode, UiPayload}, ui_preproc::UiLoad};
 
 use std::{collections::{BTreeMap}, sync::mpsc};
+use egui::{Color32, Rect, Vec2};
 use eframe::egui;
 use egui::Ui;
 
 struct AppState{
-    //Events
-    shown_payload: UiLoad,
+    startup_rx: mpsc::Receiver<i64>,
+    srx_green_flag: bool,
+    initial_event_amount: i64,
 
-    request_tx: mpsc::Sender<MergeOpcode>,
+    request_tx: mpsc::Sender<Vec<UPOpcode>>,
     payload_rx: mpsc::Receiver<UiPayload>,
-    current_request: Option<MergeOpcode>,
-
+    current_requests: Vec<UPOpcode>,
     current_payload: Option<UiPayload>,
-    ////
-    
-    //Dependent States
-    length_map: Option<BTreeMap<u64,i32>>,
-    ////
 
-    //Diagram state
-    diagram_cursor_pos: f64,
-    diagram_zoom_x: f32,
-    diagram_zoom_y: f32,
-    diagram_zoom_z: f32,
-    ////
+    shown_length_map: BTreeMap<u64, i32>,
+    fcs_slm: u16,
+    
+    frame_delay_micros: std::time::Duration,
+    frame_counter: u16,
 }
 
 impl AppState {
-    fn new(_cc: &eframe::CreationContext<'_>,request_tx: mpsc::Sender<MergeOpcode>,payload_rx: mpsc::Receiver<UiPayload>) -> Self{
-        Self {
-            shown_payload: UiLoad::default(),
+    fn new(_cc: &eframe::CreationContext<'_>,request_tx: mpsc::Sender<Vec<UPOpcode>>,payload_rx: mpsc::Receiver<UiPayload>,startup_rx: mpsc::Receiver<i64>) -> Self{
+        Self{
+            startup_rx: startup_rx,
+            srx_green_flag: false,
+            initial_event_amount: 0,
 
             request_tx: request_tx,
             payload_rx: payload_rx,
-            current_request: None,
-
+            current_requests: Vec::new(),
             current_payload: None,
 
-            length_map: None,
+            shown_length_map: BTreeMap::new(),
+            fcs_slm: 250, //frame counter schedule - shown length map
 
-            diagram_cursor_pos: 0.0,
-            diagram_zoom_x: 1.0,
-            diagram_zoom_y: 1.0,
-            diagram_zoom_z: 1.0,
+            frame_delay_micros: std::time::Duration::from_micros(16666),
+            frame_counter: 0
         }
     } 
 }
 
 
-impl eframe::App for AppState {
-    fn ui(&mut self,ctx: &mut Ui,_frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |_ui| {
-            if let Ok(payload) = self.payload_rx.try_recv(){
-                self.current_payload = Some(payload);
-            }
+impl eframe::App for AppState{
+    fn ui(&mut self,ctx: &mut Ui,_frame: &mut eframe::Frame){
+        let start_instant = std::time::Instant::now();
 
-            if let Some(UiPayload::length_map(lm)) = &self.current_payload{
-                
-            }
-            //Update dependent UI...
+        if self.frame_counter >= 10000{
+            self.frame_counter = 1;
+        }else{
+            self.frame_counter += 1;
+        }
 
-            //Change request according to user input...
+        let tokens: u64 = 10000;
+        //////////
+
+        if !self.srx_green_flag{
+            if let Ok(iea) = self.startup_rx.try_recv(){
+                self.initial_event_amount = iea;
+                self.srx_green_flag = true;
+            }
+        }else{
+            //INPUT
+
+            ////
             
-            if !self.current_request.is_none(){
-                self.request_tx.send(self.current_request.clone().unwrap()).unwrap();
+            //SCHEDULING
+            if self.frame_counter % self.fcs_slm == 0{
+                self.current_requests.push(ui_postproc::UPOpcode{
+                    xI: 2,
+                    xII: 0,
+                    xIII: 0,
+                });
+            }
+
+
+            ////
+            
+
+
+        }
+
+        egui::CentralPanel::default().show(ctx, |ui|{
+
+            let painter = ui.painter();
+
+            let square = Rect::from_min_size(
+                egui::pos2(100.0, 100.0),
+                Vec2::new(50.0, 50.0),
+            );
+
+            if !self.srx_green_flag{
+
+                painter.rect_filled(
+                    square,
+                    0.0,
+                    Color32::RED,
+                );
+                
+            }else{
+
+                painter.rect_filled(
+                    square,
+                    0.0,
+                    Color32::BLUE,
+                );
             }
         });
+
+        //////////
+        let end_elapsed = start_instant.elapsed();
+        if end_elapsed >= self.frame_delay_micros{
+            ctx.request_repaint();
+        }else{
+            ctx.request_repaint_after(self.frame_delay_micros - end_elapsed);
+        }
     }
 }
 
-pub fn start_egui(request_tx: mpsc::Sender<MergeOpcode>,payload_rx: mpsc::Receiver<UiPayload>){
+pub fn start_egui(request_tx: mpsc::Sender<Vec<UPOpcode>>,payload_rx: mpsc::Receiver<UiPayload>,startup_rx: mpsc::Receiver<i64>){
     
     let options = eframe::NativeOptions::default();
 
@@ -78,7 +128,7 @@ pub fn start_egui(request_tx: mpsc::Sender<MergeOpcode>,payload_rx: mpsc::Receiv
         "ProcessGaze",
         options,
         Box::new(move |_cc| {
-            Ok(Box::new(AppState::new(_cc, request_tx, payload_rx)))
+            Ok(Box::new(AppState::new(_cc, request_tx, payload_rx, startup_rx)))
         }),
     ).unwrap();
 }

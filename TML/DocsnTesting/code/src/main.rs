@@ -10,9 +10,9 @@ mod ui_postproc;
 mod ui;
 
 use core::time;
-use std::{thread,sync::{OnceLock,mpsc}};
+use std::{sync::{OnceLock,mpsc}, thread, time::Duration};
 
-use crate::files::{bin_read_unread,bin_write,bin_establish};
+use crate::{files::{bin_establish, bin_read_unread, bin_write}, ui_postproc::UiPayload::events};
 
 pub static TX0: OnceLock<mpsc::Sender<Vec<u8>>> = OnceLock::new();
 pub static TX2: OnceLock<mpsc::Sender<ui_preproc::UiLoad>> = OnceLock::new();
@@ -27,6 +27,8 @@ pub fn main(){
     println!("Handle: {:?}", session_handle);
     println!();
 
+    let (tx0, rx0) = std::sync::mpsc::channel::<Vec<u8>>();
+    TX0.set(tx0).unwrap();
     println!("2. OpenTraceW");
     let consumer_handle = consumer::open_trace(&session_name_c);
     println!("Handle: {:?}", consumer_handle);
@@ -39,47 +41,42 @@ pub fn main(){
     };
     println!();
 
-    println!("4. Other globals");
-    ui_preproc::init_globals();
-    ui_postproc::init_globals();
-    println!("Successfully established ui globals");
-    println!();
+    let (tx3, rx3) = std::sync::mpsc::channel::<i64>();
 
     println!("5. Spawning threads...");
 
-    let (tx0, rx0) = std::sync::mpsc::channel::<Vec<u8>>();
-    TX0.set(tx0).unwrap();
     thread::spawn(move || {
         consumer::trace_loop(consumer_handle);
     });
 
     thread::spawn(move || {
+        ui_preproc::init_globals(tx3);
+        thread::sleep(Duration::from_millis(30));
+        let snapshot_events = consumer::snapshot();
+        ui_preproc::process_snapshot(snapshot_events);
         loop{
-            let bin_vec = rx0.recv().unwrap();
+            let mut bin_vec = Vec::new();
+
+            bin_vec.extend(rx0.recv().unwrap());
             
-            let events = biner::unbin_events(&bin_vec);
-            ui_preproc::process_etw(events);
+            let eventss = biner::unbin_events(&bin_vec);
+            for e in eventss{
+                ui_preproc::process_etw(e);
+            }
             ui_preproc::merge_to_postproc();
         }
     });
-    let (tx1, rx1) = std::sync::mpsc::channel::<ui_postproc::MergeOpcode>();
+    let (tx1, rx1) = std::sync::mpsc::channel::<Vec<ui_postproc::UPOpcode>>();
     let (tx2, rx2) = std::sync::mpsc::channel::<ui_postproc::UiPayload>();
     thread::spawn(move || {
+        ui_postproc::init_globals();
         loop{
-            match rx1.recv(){
-                Ok(mo) => {tx2.send(ui_postproc::get_payload(mo)).unwrap();},
-                Err(_) => {}
+            let upos = rx1.recv().unwrap();
+            for upo in upos{
+                tx2.send(ui_postproc::get_payload(upo)).unwrap();
             }
         }
     });
 
-    println!("6. NtQuerySystemInformation");
-    println!("Waiting for etw to catch up...");
-    thread::sleep(time::Duration::from_millis(1500));
-    let snapshot_events = consumer::trace_snapshot();
-    println!("Processing {} snapshot events...", snapshot_events.len());
-    println!();
-    ui_preproc::process_snapshot(snapshot_events);
-
-    ui::start_egui(tx1,rx2);
+    ui::start_egui(tx1,rx2,rx3);
 }

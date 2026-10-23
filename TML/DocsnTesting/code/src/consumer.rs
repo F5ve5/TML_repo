@@ -150,29 +150,27 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
     TX0.get().unwrap().send(bin_vec).unwrap();
 }
 
-pub fn trace_snapshot() -> Vec<EventFinal> {
-    use std::ptr::null_mut;
+pub fn snapshot() -> Vec<EventFinal> {
 
     unsafe {
         let mut needed = 0u32;
-        let _status0 = NtQuerySystemInformation(
-            SystemProcessInformation,
-            null_mut(),
-            0,
-            &mut needed,
-        );
 
-        let mut buffer = vec![0u8; needed as usize];
-
-        let status1 = NtQuerySystemInformation(
-            SystemProcessInformation,
-            buffer.as_mut_ptr() as *mut _,
-            needed,
-            &mut needed,
-        );
-        if status1 < 0 {
-            panic!("NtQuerySystemInformation failed: {:?}", status1);
-        }
+        let buffer = loop{
+            let mut buffer = vec![0u8; needed as usize];
+            let status = NtQuerySystemInformation(
+                SystemProcessInformation,
+                buffer.as_mut_ptr() as *mut _,
+                needed,
+                &mut needed,
+            );
+            if status == -1073741820 {
+                continue;
+            }
+            if status < 0{
+                panic!("NtQuerySystemInformation returned status that indicated warning or failure: {:?}", status);
+            }
+            break buffer;
+        };
 
         let mut events: Vec<EventFinal> = Vec::new();
         let mut offset = 0usize;
@@ -198,11 +196,11 @@ pub fn trace_snapshot() -> Vec<EventFinal> {
             };
 
             let event = EventFinal {
-                other_header_values: Vec::new(),
-                timestamp,
-                opcode: 1, // snapshot = synthetic ProcessStart
-                process_id: pid,
-                properties: vec![
+                other_header_values: None,
+                timestamp: Some(timestamp),
+                opcode: Some(1), // snapshot = synthetic ProcessStart
+                process_id: Some(pid),
+                properties: Some(vec![
                     // ParentId
                     biner::EventPropertyFinal {
                         name_index: 2,
@@ -216,7 +214,7 @@ pub fn trace_snapshot() -> Vec<EventFinal> {
                         type_index: 18,
                         value: image_name.into_bytes(),
                     },
-                ],
+                ]),
             };
 
             events.push(event);

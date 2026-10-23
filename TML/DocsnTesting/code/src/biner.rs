@@ -47,16 +47,16 @@ pub fn unbin_events(bin_vec: &[u8]) -> Vec<EventFinal>{
                 current_byte += header_value_size as usize;
 
             if header_value_index == 5{
-                ef.process_id = u32::from_le_bytes([
+                ef.process_id = Some(u32::from_le_bytes([
                 header_value[0], 
                 header_value[1], 
                 header_value[2], 
                 header_value[3],
-                ]);
+                ]));
                 continue;
             }
             if header_value_index == 6 {
-                ef.timestamp = u64::from_le_bytes([
+                ef.timestamp = Some(u64::from_le_bytes([
                 header_value[0], 
                 header_value[1], 
                 header_value[2], 
@@ -65,11 +65,11 @@ pub fn unbin_events(bin_vec: &[u8]) -> Vec<EventFinal>{
                 header_value[5], 
                 header_value[6], 
                 header_value[7]
-                ]);
+                ]));
                 continue;
             }
             if header_value_index == 12 {
-                ef.opcode = header_value[0];
+                ef.opcode = Some(header_value[0]);
                 continue;
             }
             
@@ -78,7 +78,7 @@ pub fn unbin_events(bin_vec: &[u8]) -> Vec<EventFinal>{
                 value: header_value.to_vec()
             });
         }
-        ef.other_header_values = ehvf_vec;
+        ef.other_header_values = Some(ehvf_vec);
 
         while (current_byte as u32) < event_bytelen{
             property_name_index = bin_vec[current_byte];
@@ -96,13 +96,126 @@ pub fn unbin_events(bin_vec: &[u8]) -> Vec<EventFinal>{
                 value: property_value_buffer.to_vec()
             });
         }
-        ef.properties = epf_vec;
+        ef.properties = Some(epf_vec);
 
         ef_vec.push(ef);
     }
 
     ef_vec
 }
+#[inline]
+pub fn unbin_one_event(bin_vec: &[u8]) -> Option<EventFinal> {
+    let mut current_byte: usize = 0;
+
+    if bin_vec.len() < 6 {
+        return None;
+    }
+
+    // Skip the first byte (your original code did this)
+    current_byte += 1;
+
+    // Read event byte length
+    let event_bytelen = u32::from_le_bytes([
+        bin_vec[current_byte],
+        bin_vec[current_byte + 1],
+        bin_vec[current_byte + 2],
+        bin_vec[current_byte + 3],
+    ]);
+    current_byte += 4;
+
+    // Prepare output
+    let mut ef = EventFinal::default();
+    let mut ehvf_vec: Vec<EventHeaderValueFinal> = Vec::new();
+    let mut epf_vec: Vec<EventPropertyFinal> = Vec::new();
+
+    // Header values
+    let mut header_value_amount = bin_vec[current_byte];
+    current_byte += 1;
+
+    while header_value_amount > 0 {
+        header_value_amount -= 1;
+
+        let header_value_index = bin_vec[current_byte];
+        current_byte += 1;
+
+        let header_value_size = u32::from_le_bytes([
+            bin_vec[current_byte],
+            bin_vec[current_byte + 1],
+            bin_vec[current_byte + 2],
+            bin_vec[current_byte + 3],
+        ]);
+        current_byte += 4;
+
+        let header_value = &bin_vec[current_byte..current_byte + header_value_size as usize];
+        current_byte += header_value_size as usize;
+
+        match header_value_index {
+            5 => {
+                ef.process_id = Some(u32::from_le_bytes([
+                    header_value[0],
+                    header_value[1],
+                    header_value[2],
+                    header_value[3],
+                ]));
+            }
+            6 => {
+                ef.timestamp = Some(u64::from_le_bytes([
+                    header_value[0],
+                    header_value[1],
+                    header_value[2],
+                    header_value[3],
+                    header_value[4],
+                    header_value[5],
+                    header_value[6],
+                    header_value[7],
+                ]));
+            }
+            12 => {
+                ef.opcode = Some(header_value[0]);
+            }
+            _ => {
+                ehvf_vec.push(EventHeaderValueFinal {
+                    index: header_value_index,
+                    value: header_value.to_vec(),
+                });
+            }
+        }
+    }
+
+    ef.other_header_values = Some(ehvf_vec);
+
+    // Properties
+    while (current_byte as u32) < event_bytelen {
+        let property_name_index = bin_vec[current_byte];
+        current_byte += 1;
+
+        let property_value_type = bin_vec[current_byte];
+        current_byte += 1;
+
+        let property_value_buffer_size = u32::from_le_bytes([
+            bin_vec[current_byte],
+            bin_vec[current_byte + 1],
+            bin_vec[current_byte + 2],
+            bin_vec[current_byte + 3],
+        ]);
+        current_byte += 4;
+
+        let property_value_buffer =
+            &bin_vec[current_byte..current_byte + property_value_buffer_size as usize];
+        current_byte += property_value_buffer_size as usize;
+
+        epf_vec.push(EventPropertyFinal {
+            name_index: property_name_index,
+            type_index: property_value_type,
+            value: property_value_buffer.to_vec(),
+        });
+    }
+
+    ef.properties = Some(epf_vec);
+
+    Some(ef)
+}
+
 #[derive(Debug)]
 #[derive(Clone)]
 pub struct EventHeaderValueFinal{
@@ -120,12 +233,12 @@ pub struct EventPropertyFinal{
 #[derive(Default)]
 #[derive(Clone)]
 pub struct EventFinal{
-    pub other_header_values: Vec<EventHeaderValueFinal>,
-    pub timestamp: u64,
-    pub opcode: u8,
-    pub process_id: u32,
+    pub other_header_values: Option<Vec<EventHeaderValueFinal>>,
+    pub timestamp: Option<u64>,
+    pub opcode: Option<u8>,
+    pub process_id: Option<u32>,
     
-    pub properties: Vec<EventPropertyFinal>,
+    pub properties: Option<Vec<EventPropertyFinal>>,
 }
 
 #[inline]
