@@ -1273,3 +1273,7 @@ impl MakeSelfConcious for Sheep{
 "
 
 So the main thing is that a trait basically says what funcion declarations a 
+
+25102026
+
+Do note.. I kinda stopped writing in here a while ago.. as well as in most places except for like ui.md at the present moment

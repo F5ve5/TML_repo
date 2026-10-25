@@ -27,8 +27,6 @@ pub fn main(){
     println!("Handle: {:?}", session_handle);
     println!();
 
-    let (tx0, rx0) = std::sync::mpsc::channel::<Vec<u8>>();
-    TX0.set(tx0).unwrap();
     println!("2. OpenTraceW");
     let consumer_handle = consumer::open_trace(&session_name_c);
     println!("Handle: {:?}", consumer_handle);
@@ -41,9 +39,16 @@ pub fn main(){
     };
     println!();
 
-    let (tx3, rx3) = std::sync::mpsc::channel::<i64>();
 
-    println!("5. Spawning threads...");
+    println!("4. Spawning threads...");
+
+    let (tx3, rx3) = std::sync::mpsc::channel::<i64>();
+    let (tx1, rx1) = std::sync::mpsc::channel::<ui_postproc::UPOpcode>();
+    let (tx20, rx2) = std::sync::mpsc::channel::<ui_postproc::UiPayload>();
+    let tx21 = tx20.clone();
+    let (tx0, rx0) = std::sync::mpsc::channel::<Vec<u8>>();
+    TX0.set(tx0).unwrap();
+    let (tx4, rx4) = std::sync::mpsc::channel::<ui_postproc::UPOpcode>();
 
     thread::spawn(move || {
         consumer::trace_loop(consumer_handle);
@@ -63,18 +68,21 @@ pub fn main(){
             for e in eventss{
                 ui_preproc::process_etw(e);
             }
-            ui_preproc::merge_to_postproc();
+            ui_preproc::mini_merge();
+
+            while let Ok(upo) = rx4.try_recv(){
+                tx21.send(ui_preproc::get_backend_payload(upo)).expect("Payload TX failed");
+            }
+
+            /////
+            bin_write(&bin_vec).expect("bin_write failed");
         }
     });
-    let (tx1, rx1) = std::sync::mpsc::channel::<Vec<ui_postproc::UPOpcode>>();
-    let (tx2, rx2) = std::sync::mpsc::channel::<ui_postproc::UiPayload>();
     thread::spawn(move || {
         ui_postproc::init_globals();
         loop{
-            let upos = rx1.recv().unwrap();
-            for upo in upos{
-                tx2.send(ui_postproc::get_payload(upo)).unwrap();
-            }
+            let upo = rx1.recv().expect("Request RX failed");
+            tx20.send(ui_postproc::get_payload(upo,&tx4)).expect("Payload TX failed");
         }
     });
 

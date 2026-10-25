@@ -10,40 +10,34 @@ pub fn with_rup<R>(f: impl FnOnce(&mut UiLoad) -> R) -> R {
     let mut guard = mutex.lock().unwrap();
     f(&mut *guard)
 }
-
+ 
 pub fn init_globals(){
     READY_UI_PAYLOAD
         .set(Mutex::new(UiLoad::default()))
         .expect("READY_UI_PAYLOAD already initialized");
 }
 
-pub fn get_payload(opcode: UPOpcode) -> UiPayload{
+pub fn get_payload(opcode: UPOpcode,preproc_tx: &std::sync::mpsc::Sender<UPOpcode>) -> UiPayload{
 
     with_rup(|rup|{
         match opcode.xI{
-            1 => {
-                if opcode.xII == 0 && opcode.xIII == 0{
-                    UiPayload::delta_map(rup.delta_map.clone())
-                }else{
-                    UiPayload::delta_map(
-                        rup.delta_map
-                            .range(opcode.xII..opcode.xIII)
-                            .map(|(k, v)| (k.clone(), v.clone()))
-                            .collect()
-                    )
-                }
+            3 => {
+                preproc_tx.send(opcode).expect("Preprocessing TX failed");
+                UiPayload::loading(3)
             },
-            2 => {
-                if opcode.xII == 0 && opcode.xIII == 0{
-                    UiPayload::length_map(rup.length_map.clone())
-                }else{
-                    UiPayload::length_map(
-                        rup.length_map
-                            .range(opcode.xII..opcode.xIII)
-                            .map(|(k, v)| (k.clone(), v.clone()))
-                            .collect()
-                    )
-                }
+            4 => {
+                preproc_tx.send(opcode).expect("Preprocessing TX failed");
+                UiPayload::loading(4)
+            }
+            5 => {
+                let lmc = with_rup(|rup|rup.length_map_c.clone());
+                with_rup(|rup|rup.length_map_c.clear());
+                UiPayload::length_map_c(lmc)
+            }
+            6 => {
+                let dmc = with_rup(|rup|rup.delta_map_c.clone());
+                with_rup(|rup|rup.delta_map_c.clear());
+                UiPayload::delta_map_c(dmc)
             }
             _ => {
                 UiPayload::null(())
@@ -59,14 +53,32 @@ pub struct UPOpcode{
     pub xII: u64,
     pub xIII: u64,
 }
+#[derive(Clone)]
 #[repr(u8)]
 pub enum UiPayload{
-    invalid(u8) = 0,
+    loading(u8) = 0,
     I64(i64) = 1,
     events(Vec<EventFinal>) = 2,
     delta_map(BTreeMap<u64,i32>) = 3,
     length_map(BTreeMap<u64,i32>) = 4,
+    delta_map_c(BTreeMap<u64,i32>) = 5,
+    length_map_c(BTreeMap<u64,i32>) = 6,
     null(()) = 255,
+}
+//As you can't actually cast the enum variant as u8 which makes the whole #[repr(u8)] completely useless here(?)
+impl UiPayload {
+    pub fn tag(&self) -> u8 {
+        match self {
+            Self::loading(_) => 0,
+            Self::I64(_) => 1,
+            Self::events(_) => 2,
+            Self::delta_map(_) => 3,
+            Self::length_map(_) => 4,
+            Self::delta_map_c(_) => 5,
+            Self::length_map_c(_) => 6,
+            Self::null(_) => 255,
+        }
+    }
 }
 //How the ui-payload-opcode works is that an initialized version of it is sent from the UI thread to this thread whose only purpose is to give information to said UI thread. The following is an explanation of how the merge-opcode works:
 //

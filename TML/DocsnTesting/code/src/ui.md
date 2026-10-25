@@ -111,16 +111,69 @@ some sort of progress bar
 
 Meh that would be kinda messy actually, let's just have like a loading animation before it starts
 
-    let mut tries = 0;
-    loop {
-        match TX0.get().unwrap().send(bin_vec) {
-            Ok(_) => {println!("yayyyyyyyyyyyyyyyyyyyyyy, {:?}", tries); break;},
-            Err(v) => {
-                bin_vec = v.0;
-                tries += 1;
-            }
-        }
-        if tries > 10_000{
-            panic!("Its so overrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr");
-        }
-    }
+----
+
+It seems that there might be a chance of my coding time not being received by the server as i am coding on this device for some reason.
+I'm going to just a type a bit randomly because I think there is no way that all I've done yesterday has resulted to less than
+4 additional percent. Still, the bar hasn't moved in the oh now it did now it shows two minutes. Let me code for a little bit more and
+then refresh the website which is tracking my coding time. It'd be a problem if it isn't because then I wouldn't be able to finish it in
+my current location without bothering to set all of that hackatime shit up again and maybe not even then perhaps because this is like a
+school laptop or something. It's still only two minutes like what? This is a really big block of text I feel like oh 4min but I feel like
+it should've reached more by now.. Furthermore I think that that is one cause for the lack of coding time 6min and the other might be
+that time might not progress before you write the 4h devlog which would be a real issue since I just ignored that point and kept coding.
+
+Anyways I think I will keep up on this device and hope for the best. I also need a demo-link to show off basically just source code so
+that's a real pain in the ass too.
+
+Hopefully there's just like last week a period of 12h in the start where I'll be able to finish what's left otherways I'm kinda cooked.
+
+There was also like another sort of selection within terra that let me add another "hackatime project" and I added TML_repo onto the
+existing TML and I don't recall the former being there on my home device. Hackatime seems so unnecessarily messy.
+
+Woah the Terra progress bar just jumped by 11% which'd be 66min.. I'm at 20min rn.
+
+----
+
+So after the green flag is received the flow should switch from a loading screen onto the same underlying loop that'll be running for the
+rest of the program, that also means that the channel calls will start at that point and not before. The main thing of the whole idea is
+obviously the timeline so why don't I spend the next five hours working on that before shipping a demo of it.
+
+---
+
+Now the thing is that I thought that because egui/eframe is "dynamically generated ui" or something like that it'd be as or more optimal 
+to generate the entirety of a graph each frame than modifying the existing one according to the changes since its' last call, that
+theory was incorrect so I'll have to remake the payload channel convention to fit the latter.
+
+Now the type of rules that this data would adhere to is completely unique compared to the rest of its' like, as it is reset upon each new
+call for it itself or the data that it represents. One way that I could make this would be to change the UiLoad structure to contain
+additional variables which represent the change in larger datasets like btreemaps and I could have these variables adhere to different
+rules than the base ones....
+
+So instead of the preprocessing uiload simply being cloned to the postprocessing one it could be "added" and then each time that postproc
+receives a call towards this special delta variable, it resets it. So that it may only ever represent the change since ui last looked.
+
+Since if the preprocessed data is added rather than cloned then no already accounted for data is shown again
+
+I think the best way to evaluate a change like this is naturally in the ui_preproc part as it is the part to receive the changes
+themselves as opposed to if it were handled in the ui_postproc part where only the existing timeline or whatever is available so the
+changes would have to be like evaluated and stored when they are readily available in the former
+
+-
+
+Having made the system for acquiring the changes in the timeline rather than the entire timeline upon update, I'm starting to really
+reconsider the fact that the ever-increasing BTreeMaps' are cloned every single time events are processed which is basically all the time
+
+A much better approach would be to merge only the lighter variables necessary to generically update the ui perpetually, such as these
+"change" ones
+
+That although leaves the question of how and when the heavier variables are to be merged. Perchance upon request? Obviously from the ui
+thread but to the pre- or postprocessing thread? All other requests are made to the postprocessing thread but it'd not be in posession
+of said data in the given framework..
+
+Acutally I think the cleanest approach would be to establish another channel with one sender in the postprocessing thread on the
+receiver in the preprocessing thread so that requests are still made through the same mechanism from the ui thread and exceptions are
+handled when they appear by the backend rather than me having to consider what needs what when coding the ui thread
+
+Another sender for the payload channel would then also be established in the preprocessing thread
+
+-

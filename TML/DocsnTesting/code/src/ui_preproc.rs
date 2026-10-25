@@ -1,11 +1,10 @@
 use std::{cell::{RefCell}, collections::{BTreeMap, HashMap}, hash::Hash};
 
-use crate::{biner::EventFinal,misc::round_filetime_to_nearest_second,ui_postproc::with_rup};
+use crate::{biner::EventFinal, misc::round_filetime_to_nearest_second, ui_postproc::{self, UiPayload::length_map, with_rup}, ui_preproc};
 
 #[derive(Default, Debug, Clone)]
 pub struct UiLoad{
     pub startup_tx: Option<std::sync::mpsc::Sender<i64>>,
-    pub currently_active_processes: Vec<PidPlusOpcode>,
 
 
     pub pre_snapshot_events: HashMap<PidPlusOpcode,EventFinal>,
@@ -13,10 +12,14 @@ pub struct UiLoad{
 
 
     pub delta_map: BTreeMap<u64,i32>,
+    pub delta_map_c: BTreeMap<u64,i32>,
+
+
     pub events_by_prid: Vec<EventFinal>,
 
 
     pub length_map: BTreeMap<u64,i32>,
+    pub length_map_c: BTreeMap<u64,i32>,
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -90,8 +93,10 @@ fn update_lup(closure_lup: &mut UiLoad,new_event:EventFinal){
     let mut current_entry = round_filetime_to_nearest_second(&new_event.timestamp.unwrap_or(0));
     if new_event.opcode == Some(1){
         *closure_lup.delta_map.entry(current_entry).or_default() += 1;
+        *closure_lup.delta_map_c.entry(current_entry).or_default() += -1;
     }else if new_event.opcode == Some(2){
         *closure_lup.delta_map.entry(current_entry).or_default() += -1;
+        *closure_lup.delta_map_c.entry(current_entry).or_default() += -1;
     }
 
     if let Some(last_event) = closure_lup.delta_map.last_key_value(){
@@ -99,8 +104,10 @@ fn update_lup(closure_lup: &mut UiLoad,new_event:EventFinal){
         while current_entry <= *last_event.0{
             if new_event.opcode == Some(1){
                 *closure_lup.length_map.entry(current_entry).or_insert(last_lm_entry_value) += 1;
+                *closure_lup.length_map_c.entry(current_entry).or_insert(last_lm_entry_value) += 1;
             }else if new_event.opcode == Some(2){
                 *closure_lup.length_map.entry(current_entry).or_insert(last_lm_entry_value) -= 1;
+                *closure_lup.length_map_c.entry(current_entry).or_insert(last_lm_entry_value) -= 1;
             }
 
             current_entry += 10_000_000;
@@ -108,11 +115,30 @@ fn update_lup(closure_lup: &mut UiLoad,new_event:EventFinal){
     }
 }
 
-pub fn merge_to_postproc(){
-    let lup = with_lup(|lup| lup.clone());
+pub fn get_backend_payload(upo: ui_postproc::UPOpcode) -> ui_postproc::UiPayload{
+    match upo.xI{
+        3 => {
+            ui_postproc::UiPayload::delta_map(with_lup(|lup|lup.delta_map.clone()))
+        }
+        4 => {
+            ui_postproc::UiPayload::length_map(with_lup(|lup|lup.length_map.clone()))
+        }
+        _ => {ui_postproc::UiPayload::null(())}
+    }
+}
+
+pub fn mini_merge(){
+    let lup_mini_clone = with_lup(|lup|{
+        UiLoad{
+            delta_map_c: lup.delta_map_c.clone(),
+            length_map_c: lup.length_map_c.clone(),
+            ..Default::default()
+        }
+    });
 
     with_rup(|rup|{
-        *rup = lup;
+        rup.delta_map_c = lup_mini_clone.delta_map_c;
+        rup.length_map_c = lup_mini_clone.length_map_c;
     });
 
     with_lup(|lup| {

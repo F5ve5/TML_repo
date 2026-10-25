@@ -1,6 +1,6 @@
 use crate::{ui_postproc::{self, UPOpcode, UiPayload}, ui_preproc::UiLoad};
 
-use std::{collections::{BTreeMap}, sync::mpsc};
+use std::{collections::{BTreeMap,VecDeque}, sync::mpsc, {mem::replace}};
 use egui::{Color32, Rect, Vec2};
 use eframe::egui;
 use egui::Ui;
@@ -9,38 +9,44 @@ struct AppState{
     startup_rx: mpsc::Receiver<i64>,
     srx_green_flag: bool,
     initial_event_amount: i64,
+    lime_flag: bool,
 
-    request_tx: mpsc::Sender<Vec<UPOpcode>>,
+    request_tx: mpsc::Sender<UPOpcode>,
     payload_rx: mpsc::Receiver<UiPayload>,
     current_requests: Vec<UPOpcode>,
-    current_payload: Option<UiPayload>,
+    current_payloads: Vec<Option<UiPayload>>,
 
     shown_length_map: BTreeMap<u64, i32>,
-    fcs_slm: u16,
+    fcs_lmc: u16,
+
+    update_slm: bool,
     
     frame_delay_micros: std::time::Duration,
     frame_counter: u16,
 }
 
 impl AppState {
-    fn new(_cc: &eframe::CreationContext<'_>,request_tx: mpsc::Sender<Vec<UPOpcode>>,payload_rx: mpsc::Receiver<UiPayload>,startup_rx: mpsc::Receiver<i64>) -> Self{
+    fn new(_cc: &eframe::CreationContext<'_>,request_tx: mpsc::Sender<UPOpcode>,payload_rx: mpsc::Receiver<UiPayload>,startup_rx: mpsc::Receiver<i64>) -> Self{
         Self{
             startup_rx: startup_rx,
             srx_green_flag: false,
             initial_event_amount: 0,
+            lime_flag: false,
 
             request_tx: request_tx,
             payload_rx: payload_rx,
             current_requests: Vec::new(),
-            current_payload: None,
+            current_payloads: vec![None;255],
 
             shown_length_map: BTreeMap::new(),
-            fcs_slm: 250, //frame counter schedule - shown length map
+            fcs_lmc: 250, //frame counter schedule - shown length map
+
+            update_slm: false,
 
             frame_delay_micros: std::time::Duration::from_micros(16666),
-            frame_counter: 0
+            frame_counter: 10000
         }
-    } 
+    }
 }
 
 
@@ -48,13 +54,13 @@ impl eframe::App for AppState{
     fn ui(&mut self,ctx: &mut Ui,_frame: &mut eframe::Frame){
         let start_instant = std::time::Instant::now();
 
-        if self.frame_counter >= 10000{
+        if self.frame_counter > 10000{
             self.frame_counter = 1;
         }else{
             self.frame_counter += 1;
         }
 
-        let tokens: u64 = 10000;
+        let tokens: i64 = 10000;
         //////////
 
         if !self.srx_green_flag{
@@ -66,20 +72,46 @@ impl eframe::App for AppState{
             //INPUT
 
             ////
-            
-            //SCHEDULING
-            if self.frame_counter % self.fcs_slm == 0{
+            ///
+            //SCHEDULE
+            if self.frame_counter % self.fcs_lmc == 0{
                 self.current_requests.push(ui_postproc::UPOpcode{
-                    xI: 2,
+                    xI: 5,
                     xII: 0,
                     xIII: 0,
                 });
             }
-
+            ////
+            /// 
+            //OTHER
 
             ////
             
+            //REQUESTS
+            if self.current_requests.len() > 0{
+                for r in self.current_requests.drain(..){
+                    self.request_tx.send(r).expect("Request TX failed");
+                }
+            }
+            while tokens > 0{
 
+            }
+            ////
+            /// 
+            //PAYLOADS
+            while let Ok(p) = self.payload_rx.try_recv(){
+                let index = p.tag();
+                self.current_payloads[index as usize] = Some(p);
+            }
+
+            if let Some(UiPayload::length_map_c(lmc)) = self.current_payloads[5].take(){
+                for x in lmc{
+                    *self.shown_length_map.entry(x.0).or_default() += x.1;
+                }
+                self.update_slm = true;
+            }
+            ////
+            ////
 
         }
 
@@ -120,7 +152,7 @@ impl eframe::App for AppState{
     }
 }
 
-pub fn start_egui(request_tx: mpsc::Sender<Vec<UPOpcode>>,payload_rx: mpsc::Receiver<UiPayload>,startup_rx: mpsc::Receiver<i64>){
+pub fn start_egui(request_tx: mpsc::Sender<UPOpcode>,payload_rx: mpsc::Receiver<UiPayload>,startup_rx: mpsc::Receiver<i64>){
     
     let options = eframe::NativeOptions::default();
 
