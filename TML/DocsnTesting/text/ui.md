@@ -175,3 +175,9 @@ receiver in the preprocessing thread so that requests are still made through the
 handled when they appear by the backend rather than me having to consider what needs what when coding the ui thread
 
 Another sender for the payload channel would then also be established in the preprocessing thread
+
+---
+
+!lup.delta_map.is_empty() && let Some(tx) = lup.startup_tx.take()
+
+Here, the .take() is not executed if the first bool is false

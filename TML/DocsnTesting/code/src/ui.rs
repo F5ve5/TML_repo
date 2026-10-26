@@ -1,14 +1,12 @@
 use crate::{ui_postproc::{self, UPOpcode, UiPayload}, ui_preproc::UiLoad};
 
 use std::{collections::{BTreeMap,VecDeque}, sync::mpsc, {mem::replace}};
-use egui::{Color32, Rect, Vec2};
+use egui::{Color32, Key::B, Rect, Vec2};
 use eframe::egui;
 use egui::Ui;
 
 struct AppState{
-    startup_rx: mpsc::Receiver<i64>,
-    srx_green_flag: bool,
-    initial_event_amount: i64,
+    green_flag: bool,
     lime_flag: bool,
 
     request_tx: mpsc::Sender<UPOpcode>,
@@ -16,7 +14,9 @@ struct AppState{
     current_requests: Vec<UPOpcode>,
     current_payloads: Vec<Option<UiPayload>>,
 
+    initial_event_amount: i64,
     shown_length_map: BTreeMap<u64, i32>,
+    shown_delta_map:BTreeMap<u64,i32>,
     fcs_lmc: u16,
 
     update_slm: bool,
@@ -26,11 +26,9 @@ struct AppState{
 }
 
 impl AppState {
-    fn new(_cc: &eframe::CreationContext<'_>,request_tx: mpsc::Sender<UPOpcode>,payload_rx: mpsc::Receiver<UiPayload>,startup_rx: mpsc::Receiver<i64>) -> Self{
+    fn new(_cc: &eframe::CreationContext<'_>,request_tx: mpsc::Sender<UPOpcode>,payload_rx: mpsc::Receiver<UiPayload>) -> Self{
         Self{
-            startup_rx: startup_rx,
-            srx_green_flag: false,
-            initial_event_amount: 0,
+            green_flag: false,
             lime_flag: false,
 
             request_tx: request_tx,
@@ -38,8 +36,10 @@ impl AppState {
             current_requests: Vec::new(),
             current_payloads: vec![None;255],
 
+            initial_event_amount: 0,
             shown_length_map: BTreeMap::new(),
-            fcs_lmc: 250, //frame counter schedule - shown length map
+            shown_delta_map: BTreeMap::new(),
+            fcs_lmc: 250, //frame counter schedule - length map c
 
             update_slm: false,
 
@@ -62,19 +62,25 @@ impl eframe::App for AppState{
 
         let tokens: i64 = 10000;
         //////////
+        
+        if !self.lime_flag{
+            if let Some(UiPayload::delta_map_c(lmc)) = self.current_payloads[6].take(){
+                self.shown_length_map = lmc;
+            }
+        }
 
-        if !self.srx_green_flag{
-            if let Ok(iea) = self.startup_rx.try_recv(){
+        if !self.green_flag{
+            if let Some(UiPayload::iea(iea)) = self.current_payloads[1].take(){
                 self.initial_event_amount = iea;
-                self.srx_green_flag = true;
+                self.green_flag = true;
             }
         }else{
             //INPUT
 
             ////
-            ///
+            ////
             //SCHEDULE
-            if self.frame_counter % self.fcs_lmc == 0{
+            if self.frame_counter % self.fcs_lmc == 0{ 
                 self.current_requests.push(ui_postproc::UPOpcode{
                     xI: 5,
                     xII: 0,
@@ -82,7 +88,7 @@ impl eframe::App for AppState{
                 });
             }
             ////
-            /// 
+            ////
             //OTHER
 
             ////
@@ -97,7 +103,7 @@ impl eframe::App for AppState{
 
             }
             ////
-            /// 
+            ////
             //PAYLOADS
             while let Ok(p) = self.payload_rx.try_recv(){
                 let index = p.tag();
@@ -111,7 +117,6 @@ impl eframe::App for AppState{
                 self.update_slm = true;
             }
             ////
-            ////
 
         }
 
@@ -124,7 +129,7 @@ impl eframe::App for AppState{
                 Vec2::new(50.0, 50.0),
             );
 
-            if !self.srx_green_flag{
+            if !self.green_flag{
 
                 painter.rect_filled(
                     square,
@@ -152,7 +157,7 @@ impl eframe::App for AppState{
     }
 }
 
-pub fn start_egui(request_tx: mpsc::Sender<UPOpcode>,payload_rx: mpsc::Receiver<UiPayload>,startup_rx: mpsc::Receiver<i64>){
+pub fn start_egui(request_tx: mpsc::Sender<UPOpcode>,payload_rx: mpsc::Receiver<UiPayload>){
     
     let options = eframe::NativeOptions::default();
 
@@ -160,7 +165,7 @@ pub fn start_egui(request_tx: mpsc::Sender<UPOpcode>,payload_rx: mpsc::Receiver<
         "ProcessGaze",
         options,
         Box::new(move |_cc| {
-            Ok(Box::new(AppState::new(_cc, request_tx, payload_rx, startup_rx)))
+            Ok(Box::new(AppState::new(_cc, request_tx, payload_rx)))
         }),
     ).unwrap();
 }

@@ -1,14 +1,17 @@
 use std::{cell::{RefCell}, collections::{BTreeMap, HashMap}, hash::Hash};
+use ui_postproc::UiPayload;
+use windows::Win32::Foundation::ERROR_LOG_METADATA_CORRUPT;
 
 use crate::{biner::EventFinal, misc::round_filetime_to_nearest_second, ui_postproc::{self, UiPayload::length_map, with_rup}, ui_preproc};
 
 #[derive(Default, Debug, Clone)]
 pub struct UiLoad{
-    pub startup_tx: Option<std::sync::mpsc::Sender<i64>>,
+    pub ui_tx: Option<std::sync::mpsc::Sender<UiPayload>>,
 
 
     pub pre_snapshot_events: HashMap<PidPlusOpcode,EventFinal>,
     pub initial_event_amount: i64,
+    pub lime_flag_sent: bool,
 
 
     pub delta_map: BTreeMap<u64,i32>,
@@ -39,13 +42,14 @@ fn with_lup<R>(f: impl FnOnce(&mut UiLoad) -> R) -> R {
     })
 }
 
-pub fn init_globals(startup_tx:std::sync::mpsc::Sender<i64>) {
+pub fn init_globals(ui_tx:std::sync::mpsc::Sender<ui_postproc::UiPayload>) {
     LOCAL_UI_PAYLOAD.with(|cell|{
         let mut lup = cell.borrow_mut();
         *lup = UiLoad::default();
         lup.initial_event_amount = -1;
-        *lup.length_map.entry(1).or_default() = 0;
-        lup.startup_tx = Some(startup_tx);
+        *lup.length_map.entry(0).or_default() = 0;
+        lup.ui_tx = Some(ui_tx);
+        lup.lime_flag_sent = false;
     });
 }
 
@@ -128,6 +132,20 @@ pub fn get_backend_payload(upo: ui_postproc::UPOpcode) -> ui_postproc::UiPayload
 }
 
 pub fn mini_merge(){
+    with_lup(|lup| {
+        if lup.initial_event_amount != -1{
+            let iea = lup.initial_event_amount.clone();
+            lup.ui_tx.as_ref().unwrap().send(UiPayload::iea(iea)).unwrap();
+        }
+
+        if !lup.length_map_c.is_empty() && !lup.lime_flag_sent{
+            lup.length_map.pop_first();
+            let lm = lup.length_map.clone();
+            lup.ui_tx.as_ref().unwrap().send(UiPayload::length_map(lm)).unwrap();
+            lup.lime_flag_sent = true;
+        }
+    });
+
     let lup_mini_clone = with_lup(|lup|{
         UiLoad{
             delta_map_c: lup.delta_map_c.clone(),
@@ -139,12 +157,5 @@ pub fn mini_merge(){
     with_rup(|rup|{
         rup.delta_map_c = lup_mini_clone.delta_map_c;
         rup.length_map_c = lup_mini_clone.length_map_c;
-    });
-
-    with_lup(|lup| {
-        if let Some(tx) = lup.startup_tx.take(){
-            let iea = lup.initial_event_amount;
-            tx.send(iea).unwrap();
-        }
     });
 }

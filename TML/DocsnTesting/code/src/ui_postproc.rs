@@ -11,10 +11,12 @@ pub fn with_rup<R>(f: impl FnOnce(&mut UiLoad) -> R) -> R {
     f(&mut *guard)
 }
  
-pub fn init_globals(){
+pub fn init_globals(ui_tx:std::sync::mpsc::Sender<UiPayload>){
     READY_UI_PAYLOAD
         .set(Mutex::new(UiLoad::default()))
         .expect("READY_UI_PAYLOAD already initialized");
+    
+    with_rup(|rup|rup.ui_tx = Some(ui_tx))
 }
 
 pub fn get_payload(opcode: UPOpcode,preproc_tx: &std::sync::mpsc::Sender<UPOpcode>) -> UiPayload{
@@ -57,7 +59,7 @@ pub struct UPOpcode{
 #[repr(u8)]
 pub enum UiPayload{
     loading(u8) = 0,
-    I64(i64) = 1,
+    iea(i64) = 1,
     events(Vec<EventFinal>) = 2,
     delta_map(BTreeMap<u64,i32>) = 3,
     length_map(BTreeMap<u64,i32>) = 4,
@@ -70,7 +72,7 @@ impl UiPayload {
     pub fn tag(&self) -> u8 {
         match self {
             Self::loading(_) => 0,
-            Self::I64(_) => 1,
+            Self::iea(_) => 1,
             Self::events(_) => 2,
             Self::delta_map(_) => 3,
             Self::length_map(_) => 4,

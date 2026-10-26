@@ -15,7 +15,6 @@ use std::{sync::{OnceLock,mpsc}, thread, time::Duration};
 use crate::{files::{bin_establish, bin_read_unread, bin_write}, ui_postproc::UiPayload::events};
 
 pub static TX0: OnceLock<mpsc::Sender<Vec<u8>>> = OnceLock::new();
-pub static TX2: OnceLock<mpsc::Sender<ui_preproc::UiLoad>> = OnceLock::new();
 
 pub fn main(){
 
@@ -39,10 +38,10 @@ pub fn main(){
     };
     println!();
 
-
     println!("4. Spawning threads...");
 
-    let (tx3, rx3) = std::sync::mpsc::channel::<i64>();
+    let (tx30, rx3) = std::sync::mpsc::channel::<ui_postproc::UiPayload>();
+    let tx31 = tx30.clone();
     let (tx1, rx1) = std::sync::mpsc::channel::<ui_postproc::UPOpcode>();
     let (tx20, rx2) = std::sync::mpsc::channel::<ui_postproc::UiPayload>();
     let tx21 = tx20.clone();
@@ -55,7 +54,7 @@ pub fn main(){
     });
 
     thread::spawn(move || {
-        ui_preproc::init_globals(tx3);
+        ui_preproc::init_globals(tx30);
         thread::sleep(Duration::from_millis(30));
         let snapshot_events = consumer::snapshot();
         ui_preproc::process_snapshot(snapshot_events);
@@ -79,12 +78,16 @@ pub fn main(){
         }
     });
     thread::spawn(move || {
-        ui_postproc::init_globals();
+        ui_postproc::init_globals(tx31);
         loop{
             let upo = rx1.recv().expect("Request RX failed");
             tx20.send(ui_postproc::get_payload(upo,&tx4)).expect("Payload TX failed");
         }
     });
 
-    ui::start_egui(tx1,rx2,rx3);
+    println!("Successfully spawned threads!.. for now");
+    println!();
+    println!();
+
+    ui::start_egui(tx1,rx2,);
 }
