@@ -10,8 +10,8 @@ pub struct UiLoad{
 
 
     pub pre_snapshot_events: HashMap<PidPlusOpcode,EventFinal>,
-    pub initial_event_amount: i64,
     pub lime_flag_sent: bool,
+    pub initial_event_amount: i64,
 
 
     pub delta_map: BTreeMap<u64,i32>,
