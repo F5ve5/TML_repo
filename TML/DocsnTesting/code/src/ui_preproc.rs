@@ -1,16 +1,15 @@
 use std::{cell::{RefCell}, collections::{BTreeMap, HashMap}, hash::Hash};
 use ui_postproc::UiPayload;
-use windows::Win32::Foundation::ERROR_LOG_METADATA_CORRUPT;
+
 
 use crate::{biner::EventFinal, misc::round_filetime_to_nearest_second, ui_postproc::{self, UiPayload::length_map, with_rup}, ui_preproc};
 
 #[derive(Default, Debug, Clone)]
 pub struct UiLoad{
+    //Just so I can default the struct
     pub ui_tx: Option<std::sync::mpsc::Sender<UiPayload>>,
 
-
-    pub pre_snapshot_events: HashMap<PidPlusOpcode,EventFinal>,
-    pub lime_flag_sent: bool,
+    
     pub initial_event_amount: i64,
 
 
@@ -42,53 +41,29 @@ fn with_lup<R>(f: impl FnOnce(&mut UiLoad) -> R) -> R {
     })
 }
 
-pub fn init_globals(ui_tx:std::sync::mpsc::Sender<ui_postproc::UiPayload>) {
+pub fn init_globals(ui_tx:std::sync::mpsc::Sender<ui_postproc::UiPayload>){
     LOCAL_UI_PAYLOAD.with(|cell|{
         let mut lup = cell.borrow_mut();
         *lup = UiLoad::default();
         lup.initial_event_amount = -1;
         *lup.length_map.entry(0).or_default() = 0;
         lup.ui_tx = Some(ui_tx);
-        lup.lime_flag_sent = false;
     });
 }
 
 pub fn process_snapshot(events: Vec<EventFinal>) {
     with_lup(|lup| {
-        for e in events {
-            lup.pre_snapshot_events.insert(
-                PidPlusOpcode {
-                    pid: e.process_id,
-                    opcode: e.opcode
-                },
-                e,
-            );
-        }
+        let iea = events.len() as i64;
 
-        lup.initial_event_amount = lup.pre_snapshot_events.len() as i64;
-
-        let pse: Vec<EventFinal> = lup.pre_snapshot_events.values().cloned().collect();
-
-        for e in pse{
-            update_lup(lup,e);
-        }
+        lup.initial_event_amount = iea;
+        lup.ui_tx.as_ref().unwrap().send(UiPayload::iea(iea)).expect("TX30 failed");
     });
 }
 #[inline]
 pub fn process_etw(e: EventFinal) {
 
     with_lup(|lup| {
-        if lup.initial_event_amount == -1 {
-            lup.pre_snapshot_events.insert(
-                PidPlusOpcode {
-                    pid: e.process_id,
-                    opcode: e.opcode
-                },
-                e,
-            );
-        } else {
-            update_lup(lup,e);
-        }
+        update_lup(lup,e);
     });
 }
 
@@ -104,14 +79,16 @@ fn update_lup(closure_lup: &mut UiLoad,new_event:EventFinal){
     }
 
     if let Some(last_event) = closure_lup.delta_map.last_key_value(){
-        let last_lm_entry_value = closure_lup.length_map.last_key_value().unwrap().1.clone();
+        let x = closure_lup.length_map.range(..current_entry).next_back();
+        let lm_tip = *x.unwrap().1;
+
         while current_entry <= *last_event.0{
             if new_event.opcode == Some(1){
-                *closure_lup.length_map.entry(current_entry).or_insert(last_lm_entry_value) += 1;
-                *closure_lup.length_map_c.entry(current_entry).or_insert(last_lm_entry_value) += 1;
+                *closure_lup.length_map.entry(current_entry).or_insert(lm_tip) += 1;
+                *closure_lup.length_map_c.entry(current_entry).or_insert(lm_tip) += 1;
             }else if new_event.opcode == Some(2){
-                *closure_lup.length_map.entry(current_entry).or_insert(last_lm_entry_value) -= 1;
-                *closure_lup.length_map_c.entry(current_entry).or_insert(last_lm_entry_value) -= 1;
+                *closure_lup.length_map.entry(current_entry).or_insert(lm_tip) -= 1;
+                *closure_lup.length_map_c.entry(current_entry).or_insert(lm_tip) -= 1;
             }
 
             current_entry += 10_000_000;
@@ -119,30 +96,29 @@ fn update_lup(closure_lup: &mut UiLoad,new_event:EventFinal){
     }
 }
 
-pub fn get_backend_payload(upo: ui_postproc::UPOpcode) -> ui_postproc::UiPayload{
-    match upo.xI{
+pub fn get_backend_payload(upo: ui_postproc::UPOpcode){
+    let up = match upo.xI{
         3 => {
             ui_postproc::UiPayload::delta_map(with_lup(|lup|lup.delta_map.clone()))
         }
         4 => {
             ui_postproc::UiPayload::length_map(with_lup(|lup|lup.length_map.clone()))
         }
-        _ => {ui_postproc::UiPayload::null(())}
-    }
+        _ => {
+            ui_postproc::UiPayload::null(())
+        }
+    };
+    with_lup(|lup|{
+        lup.ui_tx.as_ref().unwrap().send(up).expect("Preprocessing TX failed");
+    });
 }
 
 pub fn mini_merge(){
-    with_lup(|lup| {
-        if lup.initial_event_amount != -1{
-            let iea = lup.initial_event_amount.clone();
-            lup.ui_tx.as_ref().unwrap().send(UiPayload::iea(iea)).unwrap();
-        }
-
-        if !lup.length_map_c.is_empty() && !lup.lime_flag_sent{
+    with_lup(|lup|{
+        if !lup.length_map_c.is_empty() && lup.length_map.contains_key(&0){
             lup.length_map.pop_first();
             let lm = lup.length_map.clone();
-            lup.ui_tx.as_ref().unwrap().send(UiPayload::length_map(lm)).unwrap();
-            lup.lime_flag_sent = true;
+            lup.ui_tx.as_ref().unwrap().send(UiPayload::length_map(lm)).expect("Preprocessing TX failed");
         }
     });
 

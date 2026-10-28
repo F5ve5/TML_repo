@@ -181,3 +181,15 @@ Another sender for the payload channel would then also be established in the pre
 !lup.delta_map.is_empty() && let Some(tx) = lup.startup_tx.take()
 
 Here, the .take() is not executed if the first bool is false
+
+----
+
+Fixed an error where egui happened to be duplicated because two separate imports relied on two different versions of it, causing egui to
+itself be imported two seperate times and there to be a conflict because of that, the issue was fixed by having compatible versions of the
+two.
+
+---
+
+Having an issue where the channel between the ui and the backend aren't working which they did before, I have tweaked it recently
+
+Bruh I had put the "waiting for green flag logic" inside of the "if green flag"

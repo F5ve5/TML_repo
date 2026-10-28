@@ -19,16 +19,16 @@ pub fn init_globals(ui_tx:std::sync::mpsc::Sender<UiPayload>){
     with_rup(|rup|rup.ui_tx = Some(ui_tx))
 }
 
-pub fn get_payload(opcode: UPOpcode,preproc_tx: &std::sync::mpsc::Sender<UPOpcode>) -> UiPayload{
+pub fn handle_payload(opcode: UPOpcode,preproc_tx: &std::sync::mpsc::Sender<UPOpcode>){
 
     with_rup(|rup|{
-        match opcode.xI{
+        let up = match opcode.xI{
             3 => {
-                preproc_tx.send(opcode).expect("Preprocessing TX failed");
+                preproc_tx.send(opcode).expect("Postprocessing TX failed");
                 UiPayload::loading(3)
             },
             4 => {
-                preproc_tx.send(opcode).expect("Preprocessing TX failed");
+                preproc_tx.send(opcode).expect("Postprocessing TX failed");
                 UiPayload::loading(4)
             }
             5 => {
@@ -44,9 +44,9 @@ pub fn get_payload(opcode: UPOpcode,preproc_tx: &std::sync::mpsc::Sender<UPOpcod
             _ => {
                 UiPayload::null(())
             }
-        }
+        };
+        rup.ui_tx.as_ref().unwrap().send(up).expect("Postprocessing TX failed");
     });
-    UiPayload::null(())
 }
 
 #[derive(Default,Clone)]

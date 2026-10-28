@@ -1,8 +1,9 @@
 use crate::{ui_postproc::{self, UPOpcode, UiPayload}, ui_preproc::UiLoad};
 
-use std::{collections::{BTreeMap,VecDeque}, sync::mpsc, {mem::replace}};
-use egui::{Color32, Stroke, Rect, Vec2};
-use eframe::egui;
+use std::{collections::{BTreeMap,VecDeque}, sync::mpsc};
+
+use eframe::egui::*;
+use ntapi::ntrtl::PRTL_UNLOAD_EVENT_TRACE32;
 
 struct AppState{
     green_flag: bool,
@@ -23,6 +24,7 @@ struct AppState{
     
     frame_delay_micros: std::time::Duration,
     frame_counter: u16,
+    nano_tokens: u32,
 }
 
 impl AppState {
@@ -45,29 +47,19 @@ impl AppState {
             update_sdm: false,
 
             frame_delay_micros: std::time::Duration::from_micros(16666),
-            frame_counter: 10000
+            frame_counter: 10000,
+            nano_tokens: 0,
         }
     }
 }
 
-
-impl eframe::App for AppState{
-    fn ui(&mut self,ctx: &mut egui::Ui,_frame: &mut eframe::Frame){
-        let start_instant = std::time::Instant::now();
-
-        if self.frame_counter > 10000{
-            self.frame_counter = 1;
-        }else{
-            self.frame_counter += 1;
-        }
-
-        let tokens: i64 = 10000;
-        //////////
+impl AppState{
+    pub fn pre_ui(&mut self){
         if self.green_flag{
             //INPUT
 
             //SCHEDULE
-            if(self.lime_flag){
+            if self.lime_flag{
                 if self.frame_counter % self.frame_count_timeline_request == 0{ 
                     self.current_requests.push(ui_postproc::UPOpcode{
                         xI: 5,
@@ -82,59 +74,75 @@ impl eframe::App for AppState{
                     });
                 }
             }
+        }
 
-            //OTHER
-
-
-            
-            //REQUEST HANDLING
-            if self.current_requests.len() > 0{
-                for r in self.current_requests.drain(..){
-                    self.request_tx.send(r).expect("Request TX failed");
-                }
-            }
-
-            //PAYLOAD HANDLING
-            while let Ok(p) = self.payload_rx.try_recv(){
-                let index = p.tag();
-                self.current_payloads[index as usize] = Some(p);
-            }
-
-            if !self.green_flag{
-                if let Some(UiPayload::iea(iea)) = self.current_payloads[1].take(){
-                    self.initial_event_amount = iea;
-                    self.green_flag = true;
-                }
-            }
-
-            if let Some(UiPayload::length_map_c(lmc)) = self.current_payloads[5].take(){
-                for x in lmc{
-                    *self.shown_length_map.entry(x.0).or_default() += x.1;
-                }
-                self.update_slm = true;
-                self.lime_flag = true;
-            }
-
-            if let Some(UiPayload::delta_map_c(dmc)) = self.current_payloads[6].take(){
-                for x in dmc{
-                    *self.shown_delta_map.entry(x.0).or_default() += x.1;
-                }
-                self.update_sdm = true;
+        //REQUEST SENDING
+        if self.current_requests.len() > 0{
+            for r in self.current_requests.drain(..){
+                self.request_tx.send(r).expect("Request TX failed");
             }
         }
 
+        //PAYLOAD HANDLING
+        while let Ok(p) = self.payload_rx.try_recv(){
+            let index = p.tag();
+            self.current_payloads[index as usize] = Some(p);
+        }
 
-        egui::CentralPanel::default().show(ctx, |ui|{
+        if !self.green_flag{
+            if let Some(UiPayload::iea(iea)) = self.current_payloads[1].take(){
+                self.initial_event_amount = iea;
+                self.green_flag = true;
+            }
+        }
+
+        if let Some(UiPayload::length_map_c(lmc)) = self.current_payloads[5].take(){
+            for x in lmc{
+                *self.shown_length_map.entry(x.0).or_default() += x.1;
+            }
+            self.update_slm = true;
+            self.lime_flag = true;
+        }
+
+        if let Some(UiPayload::delta_map_c(dmc)) = self.current_payloads[6].take(){
+            for x in dmc{
+                *self.shown_delta_map.entry(x.0).or_default() += x.1;
+            }
+            self.update_sdm = true;
+        }
+    }
+    
+    pub fn insert_lmc(&mut self,lmc_payload:&mut UiPayload){
+        if let UiPayload::length_map_c(lmc) = lmc_payload{
+            while let Some((time,delta)) = lmc.pop_first(){
+                *self.shown_length_map.entry(time).or_default() += delta;
+            }
+        }
+    }
+}
+
+impl eframe::App for AppState{
+    fn ui(&mut self,ctx: &mut Ui,_frame: &mut eframe::Frame){
+        let start_instant = std::time::Instant::now();
+
+        if self.frame_counter > 10000{
+            self.frame_counter = 1;
+        }else{
+            self.frame_counter += 1;
+        }
+
+        self.nano_tokens = 100_000;
+        //////////
+        CentralPanel::default().show(ctx, |ui|{
 
             let painter = ui.painter();
-
+  
             let square = Rect::from_min_size(
-                egui::pos2(100.0, 100.0),
+                pos2(0.0, 0.0),
                 Vec2::new(50.0, 50.0),
             );
 
             if !self.green_flag{
-
                 painter.rect_filled(
                     square,
                     0.0,
@@ -142,12 +150,12 @@ impl eframe::App for AppState{
                 );
                 
             }else{
-
                 painter.rect_filled(
                     square,
                     0.0,
-                    Color32::BLUE,
+                    Color32::GREEN,
                 );
+                
             }
         });
 

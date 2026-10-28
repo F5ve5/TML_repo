@@ -12,12 +12,11 @@ mod ui;
 use core::time;
 use std::{sync::{OnceLock,mpsc}, thread, time::Duration};
 
-use crate::{files::{bin_establish, bin_read_unread, bin_write}, ui_postproc::UiPayload::events};
+use crate::{files::{bin_establish, bin_read_unread, bin_write}};
 
 pub static TX0: OnceLock<mpsc::Sender<Vec<u8>>> = OnceLock::new();
 
 pub fn main(){
-
     let session_name_r: &str = "NT Kernel Logger";
     let session_name_c: Vec<u16> = misc::r_to_utf16_string(session_name_r);
 
@@ -40,8 +39,6 @@ pub fn main(){
 
     println!("4. Spawning threads...");
 
-    let (tx30, rx3) = std::sync::mpsc::channel::<ui_postproc::UiPayload>();
-    let tx31 = tx30.clone();
     let (tx1, rx1) = std::sync::mpsc::channel::<ui_postproc::UPOpcode>();
     let (tx20, rx2) = std::sync::mpsc::channel::<ui_postproc::UiPayload>();
     let tx21 = tx20.clone();
@@ -54,7 +51,7 @@ pub fn main(){
     });
 
     thread::spawn(move || {
-        ui_preproc::init_globals(tx30);
+        ui_preproc::init_globals(tx21);
         thread::sleep(Duration::from_millis(30));
         let snapshot_events = consumer::snapshot();
         ui_preproc::process_snapshot(snapshot_events);
@@ -63,14 +60,14 @@ pub fn main(){
 
             bin_vec.extend(rx0.recv().unwrap());
             
-            let eventss = biner::unbin_events(&bin_vec);
-            for e in eventss{
+            let events = biner::unbin_events(&bin_vec);
+            for e in events{
                 ui_preproc::process_etw(e);
             }
             ui_preproc::mini_merge();
 
             while let Ok(upo) = rx4.try_recv(){
-                tx21.send(ui_preproc::get_backend_payload(upo)).expect("Payload TX failed");
+                ui_preproc::get_backend_payload(upo);
             }
 
             /////
@@ -78,10 +75,10 @@ pub fn main(){
         }
     });
     thread::spawn(move || {
-        ui_postproc::init_globals(tx31);
+        ui_postproc::init_globals(tx20);
         loop{
             let upo = rx1.recv().expect("Request RX failed");
-            tx20.send(ui_postproc::get_payload(upo,&tx4)).expect("Payload TX failed");
+            ui_postproc::handle_payload(upo,&tx4);
         }
     });
 
@@ -89,5 +86,5 @@ pub fn main(){
     println!();
     println!();
 
-    ui::start_egui(tx1,rx2,);
+    ui::start_egui(tx1,rx2);
 }
