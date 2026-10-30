@@ -51,31 +51,32 @@ pub fn main(){
     });
 
     thread::spawn(move || {
-        ui_preproc::init_globals(tx21);
-        thread::sleep(Duration::from_millis(30));
+        ui_preproc::init_globals(tx20);
         let snapshot_events = consumer::snapshot();
         ui_preproc::process_snapshot(snapshot_events);
         loop{
-            let mut bin_vec = Vec::new();
+            if let Ok(etw) = rx0.try_recv(){
+                let mut bin_vec = Vec::new();
+                bin_vec.extend(etw);
 
-            bin_vec.extend(rx0.recv().unwrap());
-            
-            let events = biner::unbin_events(&bin_vec);
-            for e in events{
-                ui_preproc::process_etw(e);
+                let events = biner::unbin_events(&bin_vec);
+                for e in events{
+                    ui_preproc::process_etw(e);
+                }
+                ui_preproc::mini_merge();
+
+                bin_write(&bin_vec).expect("bin_write failed");
             }
-            ui_preproc::mini_merge();
 
             while let Ok(upo) = rx4.try_recv(){
                 ui_preproc::get_backend_payload(upo);
             }
 
-            /////
-            bin_write(&bin_vec).expect("bin_write failed");
+            std::thread::sleep(Duration::from_millis(2));
         }
     });
     thread::spawn(move || {
-        ui_postproc::init_globals(tx20);
+        ui_postproc::init_globals(tx21);
         loop{
             let upo = rx1.recv().expect("Request RX failed");
             ui_postproc::handle_payload(upo,&tx4);

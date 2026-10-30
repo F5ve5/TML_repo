@@ -1,11 +1,14 @@
-use crate::{ui_postproc::{self, UPOpcode, UiPayload}, ui_preproc::UiLoad};
+use crate::{ui_postproc::{self, UPOpcode, UiPayload}};
 
-use std::{collections::{BTreeMap,VecDeque}, sync::mpsc};
+use std::{collections::BTreeMap, ops::Sub, sync::mpsc};
 
-use eframe::egui::*;
-use ntapi::ntrtl::PRTL_UNLOAD_EVENT_TRACE32;
+use eframe::egui;
+use egui_plot;
 
 struct AppState{
+    backmost_layer: u8,
+    //0 = main
+
     green_flag: bool,
     lime_flag: bool,
 
@@ -14,22 +17,26 @@ struct AppState{
     current_requests: Vec<UPOpcode>,
     current_payloads: Vec<Option<UiPayload>>,
 
-    initial_event_amount: i64,
+    initial_event_amount: i32,
     shown_length_map: BTreeMap<u64, i32>,
     shown_delta_map:BTreeMap<u64,i32>,
-    frame_count_timeline_request: u16,
 
-    update_slm: bool,
-    update_sdm: bool,
+    redraw_slm: bool,
+    redraw_sdm: bool,
     
+    nano_tokens: u32,
     frame_delay_micros: std::time::Duration,
     frame_counter: u16,
-    nano_tokens: u32,
+    frame_count_timeline_request: u16,
+
+    bars: Vec<egui_plot::Bar>,
 }
 
 impl AppState {
     fn new(_cc: &eframe::CreationContext<'_>,request_tx: mpsc::Sender<UPOpcode>,payload_rx: mpsc::Receiver<UiPayload>) -> Self{
         Self{
+            backmost_layer: 0,
+
             green_flag: false,
             lime_flag: false,
 
@@ -41,88 +48,115 @@ impl AppState {
             initial_event_amount: 0,
             shown_length_map: BTreeMap::new(),
             shown_delta_map: BTreeMap::new(),
-            frame_count_timeline_request: 250,
 
-            update_slm: false,
-            update_sdm: false,
+            redraw_slm: false,
+            redraw_sdm: false,
 
+            nano_tokens: 0,
             frame_delay_micros: std::time::Duration::from_micros(16666),
             frame_counter: 10000,
-            nano_tokens: 0,
+            frame_count_timeline_request: 300,
+
+            bars: Vec::new(),
         }
     }
 }
 
 impl AppState{
     pub fn pre_ui(&mut self){
-        if self.green_flag{
-            //INPUT
+        //REQUEST SCHEDULES
+        if self.green_flag && self.lime_flag{
+            if self.frame_counter % self.frame_count_timeline_request == 0{
+                self.current_requests.push(ui_postproc::UPOpcode{
+                    xI: 5,
+                    xII: 0,
+                    xIII: 0,
+                });
 
-            //SCHEDULE
-            if self.lime_flag{
-                if self.frame_counter % self.frame_count_timeline_request == 0{ 
-                    self.current_requests.push(ui_postproc::UPOpcode{
-                        xI: 5,
-                        xII: 0,
-                        xIII: 0,
-                    });
-
-                    self.current_requests.push(ui_postproc::UPOpcode{
-                        xI: 6,
-                        xII: 0,
-                        xIII: 0,
-                    });
-                }
+                self.current_requests.push(ui_postproc::UPOpcode{
+                    xI: 6,
+                    xII: 0,
+                    xIII: 0,
+                });
             }
         }
 
         //REQUEST SENDING
         if self.current_requests.len() > 0{
             for r in self.current_requests.drain(..){
+                println!("sending request {:?}", r);
                 self.request_tx.send(r).expect("Request TX failed");
             }
         }
 
-        //PAYLOAD HANDLING
+        //PAYLOAD RECEIVING
         while let Ok(p) = self.payload_rx.try_recv(){
             let index = p.tag();
             self.current_payloads[index as usize] = Some(p);
         }
 
-        if !self.green_flag{
-            if let Some(UiPayload::iea(iea)) = self.current_payloads[1].take(){
-                self.initial_event_amount = iea;
-                self.green_flag = true;
+        //PAYLOAD HANDLING
+
+        for x in self.current_payloads.iter().enumerate(){
+            if !self.current_payloads[x.0].is_none(){
             }
         }
 
-        if let Some(UiPayload::length_map_c(lmc)) = self.current_payloads[5].take(){
-            for x in lmc{
-                *self.shown_length_map.entry(x.0).or_default() += x.1;
-            }
-            self.update_slm = true;
+        if let Some(UiPayload::iea(iea)) = self.current_payloads[1].take(){
+            self.initial_event_amount = iea;
+            self.green_flag = true;
+        }
+
+
+        if let Some(UiPayload::length_map(lm)) = self.current_payloads[4].take(){
+            self.shown_length_map = lm;
             self.lime_flag = true;
         }
 
-        if let Some(UiPayload::delta_map_c(dmc)) = self.current_payloads[6].take(){
-            for x in dmc{
-                *self.shown_delta_map.entry(x.0).or_default() += x.1;
-            }
-            self.update_sdm = true;
+        if let Some(UiPayload::length_map_c(mut lmc)) = self.current_payloads[5].take(){
+            self.insert_lmc(&mut lmc);
+            println!("lmc handled");
+            
+            self.redraw_slm;
+        }
+
+
+        if let Some(UiPayload::delta_map_c(mut dmc)) = self.current_payloads[6].take(){
+            self.insert_dmc(&mut dmc);
+            
+            self.redraw_sdm;
+        }
+
+        //INIMMEDIATE PAYLOAD LOGIC
+        if self.redraw_slm{
+
         }
     }
     
-    pub fn insert_lmc(&mut self,lmc_payload:&mut UiPayload){
-        if let UiPayload::length_map_c(lmc) = lmc_payload{
-            while let Some((time,delta)) = lmc.pop_first(){
-                *self.shown_length_map.entry(time).or_default() += delta;
-            }
+    pub fn insert_lmc(&mut self,lmc_payload:&mut BTreeMap<u64,i32>){
+
+      
+            self.bars.extend(lmc_payload
+                .iter()
+                .map(|(time, delta)| {
+                    egui_plot::Bar::new(*time as f64, *delta as f64)
+                })
+            );
+
+
+    }
+
+    pub fn insert_dmc(&mut self,dmc_payload:&mut BTreeMap<u64,i32>){
+
+        while let Some((time,delta)) = dmc_payload.pop_first(){
+            *self.shown_delta_map.entry(time).or_default() += delta;
         }
+
     }
 }
 
 impl eframe::App for AppState{
-    fn ui(&mut self,ctx: &mut Ui,_frame: &mut eframe::Frame){
+    fn ui(&mut self,ctx: &mut egui::Ui,_frame: &mut eframe::Frame){
         let start_instant = std::time::Instant::now();
 
         if self.frame_counter > 10000{
@@ -133,28 +167,36 @@ impl eframe::App for AppState{
 
         self.nano_tokens = 100_000;
         //////////
-        CentralPanel::default().show(ctx, |ui|{
+        
+        self.pre_ui();
+        
+        egui::CentralPanel::default().show(ctx, |ui|{
 
             let painter = ui.painter();
-  
-            let square = Rect::from_min_size(
-                pos2(0.0, 0.0),
-                Vec2::new(50.0, 50.0),
-            );
+
+            let window_size = ui.max_rect();
+            let top = window_size.min.y;
+            let left = window_size.min.x;
+            let w = window_size.width();
+            let h = window_size.height();
+
+            if self.redraw_slm{
+                egui_plot::Plot::new("length_graph")
+                    .height(600.0)
+                    .show(ui, |plot_ui| {
+                    plot_ui.bar_chart(
+                        egui_plot::BarChart::new("Lengths", self.bars.clone())
+                    );
+                });
+                println!("graph drawn");
+            }
+        
 
             if !self.green_flag{
-                painter.rect_filled(
-                    square,
-                    0.0,
-                    Color32::RED,
-                );
+
                 
             }else{
-                painter.rect_filled(
-                    square,
-                    0.0,
-                    Color32::GREEN,
-                );
+
                 
             }
         });

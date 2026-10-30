@@ -32,13 +32,13 @@ pub fn handle_payload(opcode: UPOpcode,preproc_tx: &std::sync::mpsc::Sender<UPOp
                 UiPayload::loading(4)
             }
             5 => {
-                let lmc = with_rup(|rup|rup.length_map_c.clone());
-                with_rup(|rup|rup.length_map_c.clear());
+                let lmc = rup.length_map_c.clone();
+                rup.length_map_c.clear();
                 UiPayload::length_map_c(lmc)
             }
             6 => {
-                let dmc = with_rup(|rup|rup.delta_map_c.clone());
-                with_rup(|rup|rup.delta_map_c.clear());
+                let dmc = rup.delta_map_c.clone();
+                rup.delta_map_c.clear();
                 UiPayload::delta_map_c(dmc)
             }
             _ => {
@@ -49,17 +49,17 @@ pub fn handle_payload(opcode: UPOpcode,preproc_tx: &std::sync::mpsc::Sender<UPOp
     });
 }
 
-#[derive(Default,Clone)]
+#[derive(Default,Clone,Debug)]
 pub struct UPOpcode{
     pub xI: u8,
     pub xII: u64,
     pub xIII: u64,
 }
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 #[repr(u8)]
 pub enum UiPayload{
     loading(u8) = 0,
-    iea(i64) = 1,
+    iea(i32) = 1,
     events(Vec<EventFinal>) = 2,
     delta_map(BTreeMap<u64,i32>) = 3,
     length_map(BTreeMap<u64,i32>) = 4,

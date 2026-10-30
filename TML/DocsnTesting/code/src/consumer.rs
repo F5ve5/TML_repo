@@ -147,7 +147,7 @@ extern "system" fn gimme_eventdata(er: *mut EVENT_RECORD){
     let bv_len_from_255 = bin_vec.len() as u32;
     bin_vec[1..5].copy_from_slice(&bv_len_from_255.to_le_bytes());
 
-    TX0.get().unwrap().send(bin_vec).unwrap();
+    TX0.get().unwrap().send(bin_vec).expect("Consumer TX failed");
 }
 
 pub fn snapshot() -> Vec<EventFinal> {
@@ -167,7 +167,7 @@ pub fn snapshot() -> Vec<EventFinal> {
                 continue;
             }
             if status < 0{
-                panic!("NtQuerySystemInformation returned status that indicated warning or failure: {:?}", status);
+                panic!("NtQuerySystemInformation returned status that indicated other warning or failure: {:?}", status);
             }
             break buffer;
         };
