@@ -177,3 +177,30 @@ handled when they appear by the backend rather than me having to consider what n
 Another sender for the payload channel would then also be established in the preprocessing thread
 
 -
+
+                let mut pid_v: Vec<u32> = vec![];
+                for v in rup.events_by_uid.iter(){
+                    let mut closest_start: u64 = 0;                
+                    for e in v.iter().enumerate(){
+                        let t = e.1.timestamp.unwrap();
+                        let o = e.1.opcode.unwrap();
+                        if o == 1{
+                            if t > closest_start && t <= opcode.xII{
+                                closest_start = t;
+                            }
+                        }
+                    }
+                    for e in v{
+                        let t = e.timestamp.unwrap();
+                        let o = e.opcode.unwrap();
+                        if o == 2{
+                            if t >= closest_start{
+                                if t < opcode.xII{
+                                    continue;
+                                }else{
+                                    pid_v.push(e.process_id.unwrap_or(0));
+                                }
+                            }
+                        }
+                    }
+                }

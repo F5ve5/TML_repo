@@ -20,7 +20,9 @@ pub struct UiLoad{
     pub delta_map_c: BTreeMap<u64,i32>,
 
 
-    pub events_by_prid: Vec<EventFinal>,
+    pub uid_hm: HashMap<u32,u32>,
+    pub current_uid: u32,
+    pub events_by_uid: Vec<Vec<EventFinal>>,
 
 
     pub length_map: BTreeMap<u64,i32>,
@@ -51,6 +53,7 @@ pub fn init_globals(ui_tx:std::sync::mpsc::Sender<ui_postproc::UiPayload>){
         lup.initial_event_amount = -1;
         lup.ui_tx = Some(ui_tx);
         lup.lime_flagged = false;
+        lup.current_uid = 0;
     });
 }
 
@@ -59,7 +62,10 @@ pub fn process_snapshot(events: Vec<EventFinal>) {
         let iea = events.len() as i32;
 
         lup.initial_event_amount = iea;
-        *lup.length_map.entry(0).or_default() = iea;
+        *lup.length_map.entry(0).or_default() = 0;
+        for e in events{
+            update_lup(lup, e, true);
+        }
 
         lup.ui_tx.as_ref().unwrap().send(UiPayload::iea(iea)).expect("TX30 failed");
     });
@@ -68,22 +74,25 @@ pub fn process_snapshot(events: Vec<EventFinal>) {
 pub fn process_etw(e: EventFinal) {
 
     with_lup(|lup| {
-        update_lup(lup,e);
+        update_lup(lup,e,false);
     });
 }
 
 #[inline]
-fn update_lup(closure_lup: &mut UiLoad,new_event:EventFinal){
-    let mut delta: i32;
-    if new_event.opcode == Some(1){
+fn update_lup(closure_lup: &mut UiLoad,new_event:EventFinal,snapshot: bool){
+    let delta: i32;
+    if new_event.opcode == Some(1) || snapshot{
         delta = 1;
     }else if new_event.opcode == Some(2){
         delta = -1;
     }else{
         return
     }
+    if new_event.timestamp.is_none(){
+        return
+    }
 
-    let mut current_entry = round_filetime_to_nearest_second(&new_event.timestamp.unwrap_or(0));
+    let mut current_entry = round_filetime_to_nearest_second(&new_event.timestamp.unwrap());
     *closure_lup.delta_map.entry(current_entry).or_default() += delta;
     *closure_lup.delta_map_c.entry(current_entry).or_default() += delta;
 
@@ -104,6 +113,18 @@ fn update_lup(closure_lup: &mut UiLoad,new_event:EventFinal){
             current_entry += 10_000_000;
         }
     }
+    
+    //See if the pid has already been registered
+    if let Some((_,uid)) = closure_lup.uid_hm.get_key_value(&new_event.process_id.unwrap_or(u32::MAX)){
+        //If yes, go into that entry and push the new event
+        closure_lup.events_by_uid[*uid as usize].push(new_event);
+    }else{
+        //If no, register the new pid by a new index in events_by_uid and push the event to that index
+        closure_lup.uid_hm.insert(new_event.process_id.clone().unwrap_or(u32::MAX), closure_lup.events_by_uid.len() as u32);
+        closure_lup.events_by_uid.push(vec![new_event]);
+    }
+    //This way, only one copy is kept of each event and keeping track of them becomes relatively simple
+    //Also, events that somehow have an opcode of 1 or 2 but no PID are registered under the same replacement
 }
 
 pub fn get_backend_payload(upo: ui_postproc::UPOpcode){
@@ -129,7 +150,7 @@ pub fn get_backend_payload(upo: ui_postproc::UPOpcode){
 
 pub fn mini_merge(){
     with_lup(|lup|{
-        if  !lup.lime_flagged && !lup.length_map_c.is_empty(){
+        if !lup.lime_flagged && !lup.length_map_c.is_empty(){
 
             let mut lm_clone = lup.length_map.clone();
             lm_clone.pop_first();
@@ -146,12 +167,18 @@ pub fn mini_merge(){
         UiLoad{
             delta_map_c: lup.delta_map_c.clone(),
             length_map_c: lup.length_map_c.clone(),
+            events_by_uid: lup.events_by_uid.clone(),
             ..Default::default()
         }
     });
+    with_lup(|lup|{
+        lup.delta_map_c.clear();
+        lup.length_map_c.clear();
+    });
 
     with_rup(|rup|{
-        rup.delta_map_c = lup_mini_clone.delta_map_c;
-        rup.length_map_c = lup_mini_clone.length_map_c;
+        rup.delta_map_c.extend(lup_mini_clone.delta_map_c);
+        rup.length_map_c.extend(lup_mini_clone.length_map_c);
+        rup.events_by_uid = lup_mini_clone.events_by_uid;
     });
 }

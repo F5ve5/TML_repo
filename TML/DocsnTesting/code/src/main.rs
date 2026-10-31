@@ -77,6 +77,7 @@ pub fn main(){
     });
     thread::spawn(move || {
         ui_postproc::init_globals(tx21);
+        thread::sleep(Duration::from_millis(3));
         loop{
             let upo = rx1.recv().expect("Request RX failed");
             ui_postproc::handle_payload(upo,&tx4);

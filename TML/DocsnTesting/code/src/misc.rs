@@ -28,3 +28,7 @@ pub fn round_filetime_to_nearest_second(ft: &u64) -> u64 {
         seconds * TICKS_PER_SECOND
     }
 }
+
+pub fn turn_filetime_to_second(ft: &u64) -> u64{
+    ft / 10_000_000
+}

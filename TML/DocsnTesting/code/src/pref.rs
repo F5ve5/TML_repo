@@ -22,7 +22,7 @@ pub const WANTED_EVENT_HEADER_INFO: [bool; 17] = [
     true,
     false,
     false,
-    false,
+    true,
     true,
     true,
     true,

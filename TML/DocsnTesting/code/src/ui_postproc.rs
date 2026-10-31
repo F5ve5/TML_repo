@@ -1,4 +1,4 @@
-use windows::Win32::Graphics::Dxgi::DXGI_OUTDUPL_POINTER_SHAPE_TYPE;
+    use windows::Win32::Graphics::Dxgi::DXGI_OUTDUPL_POINTER_SHAPE_TYPE;
 
 use crate::{biner::EventFinal, misc::round_filetime_to_nearest_second, ui_preproc::UiLoad};
 
@@ -20,9 +20,49 @@ pub fn init_globals(ui_tx:std::sync::mpsc::Sender<UiPayload>){
 }
 
 pub fn handle_payload(opcode: UPOpcode,preproc_tx: &std::sync::mpsc::Sender<UPOpcode>){
-
     with_rup(|rup|{
         let up = match opcode.xI{
+            2 => {
+                let mut pid_v: Vec<u32> = vec![];
+                for events in rup.events_by_uid.iter() {
+
+                        
+                    let latest_start = events
+                        .iter()
+                        .filter_map(|e|{
+                            let t = e.timestamp?;
+                            let o = e.opcode?;
+                            if o == 1 && t <= opcode.xII {
+                                Some(t)
+                            } else {
+                                None
+                            }
+                        })
+                        .max();
+
+                    let Some(start) = latest_start else{
+                        continue;
+                    };
+
+                    let terminated = events.iter().any(|e|{
+                        matches!(
+                            (e.timestamp, e.opcode),
+                            (Some(t), Some(2)) if t >= start && t < opcode.xII
+                        )
+                    });
+
+                    if !terminated {
+                        if let Some(pid) = events.first().and_then(|e| e.process_id) {
+                            pid_v.push(pid);
+                        }
+                    }
+                }
+                println!("events active at this point:");
+                for pid in pid_v{
+                    print!("{:?} ",pid);
+                }
+                UiPayload::loading(2)
+            }
             3 => {
                 preproc_tx.send(opcode).expect("Postprocessing TX failed");
                 UiPayload::loading(3)
