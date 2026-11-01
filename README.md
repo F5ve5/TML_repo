@@ -18,5 +18,8 @@ MSVC v143 - VS 2022 C++ x64/x86 build tools
 
 Windows 11 SDK (some recent version)
 
-Aaand at the moment my program won't do much at all but THAT'LL CHANGE.. that's why I'm writing this at the bottom
-of the readme so that it's easy to find and remove
+At the current moment, the timeline is presented as a bar-chart using the egui_plot library and if you press anywhere
+on it then all of the PIDs for each process active at that point will be displayed, that's bound to change soon though
+if it hasn't already.
+
+If it's still refusing to work, restarting your pc tends to do the trick
