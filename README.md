@@ -14,5 +14,4 @@ in an interactable window.
 At the state of the current release, the timeline is displayed as a barchart in a window and clicking anywhere on
 the bar-chart lists the PIDs of all active processes at that point in the command panel that opened with it.
 
-The program has to be run as admin so right-click the .exe and press "Run as administrator" and then yes and it
-should work.
+more specific launch info in the release
