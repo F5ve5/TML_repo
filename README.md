@@ -10,16 +10,3 @@ flow of events afterwards.
 
 These events then go trough a small series of processing steps before eventually being presented as a timeline
 in an interactable window.
-
-This app requires admin to run as well as the following installments from the Desktop Development with C++ workload
-from Visual Studio Community 2022:
-
-MSVC v143 - VS 2022 C++ x64/x86 build tools
-
-Windows 11 SDK (some recent version)
-
-At the current moment, the timeline is presented as a bar-chart using the egui_plot library and if you press anywhere
-on it then all of the PIDs for each process active at that point will be displayed, that's bound to change soon though
-if it hasn't already.
-
-If it's still refusing to work, restarting your pc tends to do the trick
