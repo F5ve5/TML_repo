@@ -20,4 +20,5 @@ also view startup processes.
 At the state of the current release, the timeline is displayed as a barchart in a window and clicking anywhere on
 the bar-chart lists the PIDs of all active processes at that point in the command panel that opened with it.
 
-launch info in the github release
+**In the GitHub Release/in the Terra HackClub Demo will you find instructions on how to launch the app and run it,
+it's inconvenient to list in here because I can't show any pictures**
