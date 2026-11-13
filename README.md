@@ -1,24 +1,110 @@
-TML stands for Task Manager Logger. What that implies is an app that is basically like task manager but with a
-logger/timeline mechanic.
+# TML
 
-So you start the app and it scans for the processes currently running and then goes on to keep track of the changes
-in processes since that point in order for you to read what processes are active at any point since that start.
+**TML stands for Task Manager Logger, that's the original name for this project. The goal is to create an application that centers around the same
+thing as Task Manager but with the added functionality of not only being able to inspect ongoing tasks that are happening right now, but also
+tasks that have happened in the past. Thus, logging a series of instances of Task Managers' state and displaying them as a timeline,
+All the while maintaining a reasonably user-friendly and understandable interface.**
 
-The purpose of this application is to give the user more intuitive insight into what's happening on their device.
-I intend to design it so that you don't need extensive knowledge about PIDs, kernel providers and whatnot in
-order to know what processes are being ran behind the scenes, what they're doing and what causes them.
+### Motivation
 
-The app makes use of NtQuerySystemInformation and ETW (Kernel Process Provider) + TDH to construct a timeline of
-running processes since application start. These events then go trough a small series of processing steps before
-eventually being presented as a timeline in an interactable window.
+There are reasonably few alternatives to bridge the gap between raw system-level process monitoring and an accessible visualization of that
+activity over time, these include but probably aren't limited to:
 
----
+- Task Manager - Shows currently running processes along with some resource usage but isn't actually designed to be shown as any kind of timeline
+  
+- Process Explorer - Another free alternative which offers considerably more insight into individual processes, specializes in process properties,
+  parent-child relationships, open handled loaded DLLs and hardware usage. This alternative is probably the closest to what my project aims to
+  be
+  
+- Process Monitor (Procmon) - Once another free alternative, this one specializes in real-time system monitoring and tracking file system,
+  registry, process and thread operations for debugging and diagnostics. Having the most details out of all of the listed alternatives but also by
+  far, the steepest learning curve
+  
+- Windows Event Viewer - Also free and also requires some degree of familiarity with the windows logging systems, event IDs, event properties and
+  whatnot to use effectively for process investigation.
 
-I also intend to eventually deploy a mechanic that let's you schedule a scan to start for next boot so that you may
-also view startup processes.
+- Certain Antivirus/EDR software - Almost always not free and the only one of the alternatives listed not owned by microsoft themselves, does often
+  offer a friendlier interface but an interface that is more focused on objective threats rather than insight into system activity
 
-At the state of the current release, the timeline is displayed as a barchart in a window and clicking anywhere on
-the bar-chart lists the PIDs of all active processes at that point in the command panel that opened with it.
+But how can my project in any way compete with applications that are managed by either the owners of windows or cybersecurity specialists?
 
-**In the GitHub Release/in the Terra HackClub Demo will you find instructions on how to launch the app and run it,
-it's inconvenient to list in here because I can't show any pictures**
+Well the first point is that almost all resources that the listed applications use in order to receive the system information that they display is also
+available to any other third-party developer and the second, main point is that none of them really aim to make the information accessible to the
+average windows-user who might want some simple insight into what happens on device startup or maybe they want to know what third-party software a
+videogame might be using or maybe they simply want to scavenge for harmful viruses or malware; and all of this without spending a week on learning
+windows event semantics or process and thread debugging, that's where my project provides a clean and understandable interface for understanding your
+device in ways that you already should be able to.
+
+## Technical Overview
+
+The entirety of TML's application logic is written in Rust. The primary reason for choosing Rust was its emphasis on memory safety and efficient resource
+management. This is particularly relevant to a project such as TML, where incoming system events require continuous data processing and the handling of
+potentially large numbers of temporary data buffers.
+
+As for said resources also available to third-party developers, the two main ones that my project is currently in use of are:
+
+- Event Tracing for Windows (ETW) - The general and original tracing infrastructure that allows for collecting data on real-time events generated by the
+  operating system and other software on the device. ETW works by starting a session with a configuration that accounts for which information that it is
+  to receive and subsequently configuring a consumer with the correct settings to interpret information from said session This is what TML relies on to
+  collect the continuous flow of events that is eventually structured into a timeline
+
+- Windows Native API (NTAPI) - A low-level interface to Windows system functionality. TML uses the function NtQuerySystemInformation with information
+  class SystemProcessInformationto to retrieve an initial snapshot of currently running processes, allowing it to account for processes that existed
+  before ETW event tracing began
+
+These two allow me to construct the timeline for the current version of TML.
+
+As for how native Windows functions are made available to me, TML utilizes the windows crate, which provides Rust bindings to the Windows API. These
+bindings allow for me to interact with native Windows functionality through Rust-compatible interfaces, granting access to the underlying system APIs.
+The windows crate is pretty much crucial for TML because without it I'd have to write the bindings myself which I quickly realized was not very optimal.
+
+Furthermore, the Windows Software Development Kit (SDK) and Microsoft Visual C++ (MSVC) toolchain provide the necessary resources and tooling to compile
+and link TML against native Windows libraries.
+
+Other non-windows dependencies include chrono and egui/eframe which is a Rust GUI framework used to build and run TML's graphical interface, providing
+UI components, rendering and clean, non-bloat lifecycle management. Also egui_plot is currently deployed for the projects' barchart representative of
+the process timeline, it's inflexible though and unneeded in the near future. The use of the chrono crate is self-explanatory in this project.
+
+### Architecture
+
+For a quick rundown of how the logic constructs a timeline from the continuous flow of events from ETW and the initial snapshot. Not getting into much
+technical detail, below are the different steps that the raw system data go through in order to be displayed as a timeline:
+
+1. The ETW session is started, specifically the NT Kernel Logger version. This being what actually provides the raw events.
+   
+2. The relevant consumer is initialized for said session, starting the flow of events. Decoding the properties of each event in use of Trace Data Helper
+   (TDH) which is something I'll likely be able to optimize out eventually but at the moment the property block of each event is just a mysterious block
+   of bytes which can be laid out in a number of different ways. Each event also comes with a header but it's in the form of pure variables so no need
+   for decoding that. So after TDH, the event-receiver loop sends off the decoded event in a binary format through a channel to the next step before
+   waiting to receive the next event.
+
+The ETW session is ran on its' own dedicated background thread while the consumer is ran on a native thread
+  
+3. The ui-preprocessing thread receives the binary and its' able to do two different things currently, those being writing said binary formatted events
+   into a file for the sake of documenting the session and updating the local ui payload. The local ui payload is a struct containing a couple variables
+   consisting mostly of collections which represent different event data formats and variants relevant to displaying the timeline later down the line on
+   the ui thread, the main thread. The event snapshot is done upon the initialization of this thread.
+
+4. The purpose of this thread, the ui-postprocessing thread is to make it possible for the ui thread to receive the information that it needs quickly,
+   without waiting for the preprocessing thread to complete its' current iteration of converting binaries. This is done by cloning all light information
+   from the local ui payload over to the **ready** ui payload on this thread every time preprocessing completes processing a new batch of data, something
+   I call a mini-merge as it avoids unnecessary cloning of big data-types which likely is not needed as quickly as small ones. The postprocessing thread
+   is the only one that the ui thread might send requests to. A channel is however also established from the post to pre thread and from the pre to ui
+   thread to account for when the ui does actually need one of the big data types not included in the mini-merge.
+
+5. The last thread is the ui thread, which should be pretty self-explanatory by now. However, in the current version of TML it only displays en egui_plot
+   barchart which is the current presentation of the timeline. I could also add that it starts rendering when it has received the first event from ETW
+   plus proof of the snapshot.
+
+### Current Progress
+
+TML is at the moment ultimately rendered far from complete, it does not yet to what it sets out to and it is frankly unstable right now. It is
+however supposed to offer some minimal proof of concept by displaying a barchart in a window and allowing you to click anywhere in that window to list the
+PID of every process active at that point:
+
+<img width="2402" height="749" alt="Screenshot 2026-11-14 004027" src="https://github.com/user-attachments/assets/5ff55573-7214-41e1-a6c0-6e0668061649" />
+
+## How To Run It
+
+
+
