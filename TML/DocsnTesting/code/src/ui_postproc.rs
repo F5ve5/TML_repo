@@ -57,7 +57,7 @@ pub fn handle_payload(opcode: UPOpcode,preproc_tx: &std::sync::mpsc::Sender<UPOp
                         }
                     }
                 }
-                println!("events active at this point:");
+
                 for pid in pid_v{
                     print!("{:?} ",pid);
                 }
