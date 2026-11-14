@@ -106,5 +106,23 @@ PID of every process active at that point:
 
 ## How To Run It
 
+In the one and only current release, install the .exe and run it as admin:
+<img width="779" height="662" alt="Screenshot 2026-11-14 005412" src="https://github.com/user-attachments/assets/5801bb9a-7ccd-43d9-ba5b-f808f0aebf24" />
+
+If you get error:
+<img width="364" height="73" alt="695230958-b7397235-acd3-447c-aa82-c7a3b2996c3d" src="https://github.com/user-attachments/assets/c1a701ad-81a2-44d9-b941-03f17e3587b0" />
+
+Then install and run https://aka.ms/vs/17/release/vc_redist.x64.exe
+
+If it still doesn't work then try entering 
+
+**logman stop "NT Kernel Logger" -ets**
+
+in an admin terminal and then running the TML .exe as admin again
+
+
+
+
+
 
 
